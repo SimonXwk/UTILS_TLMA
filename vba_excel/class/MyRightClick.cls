@@ -84,17 +84,17 @@ Public Function ClearRightClickMenu(Optional ClearCell As Boolean = True, Option
 End Function
 
 ' ******************************************************************************************
-' Build On Action String
+' Build .OnAction String
 ' ******************************************************************************************
 Private Function BuildOnActionString(FuncName As String, Optional argArr = vbNullString)
-    Dim X As Long
+    Dim idx As Long
     Dim result As String
     result = "'" & CStr(FuncName) & " "
 
     If IsArray(argArr) Then
-        For X = LBound(argArr) To UBound(argArr)
-            result = result & """" & CStr(argArr(X)) & """"
-        Next X
+        For idx = LBound(argArr) To UBound(argArr)
+            result = result & """" & CStr(argArr(idx)) & """"
+        Next idx
     Else
         If argArr <> vbNullString Then result = result & """" & CStr(argArr) & """"
     End If
@@ -102,6 +102,7 @@ Private Function BuildOnActionString(FuncName As String, Optional argArr = vbNul
     result = result & "'"
     BuildOnActionString = result
 End Function
+
 ' ******************************************************************************************
 ' Add an item to right Click Menu
 ' ******************************************************************************************
@@ -112,12 +113,10 @@ Public Function ButtonText(text As String, Optional CharIndex As Long = 0)
     ButtonText = thisText
 End Function
 
-
-
 ' ******************************************************************************************
 ' Add an item to right Click Menu
 ' ******************************************************************************************
-Public Function AddItem(cb As CommandBar, Caption As String, FuncName As String, Optional FuncParamArr = vbNullString)
+Private Function AddItem(cb As CommandBar, Caption As String, FuncName As String, Optional FuncParamArr = vbNullString)
 '     If cb.Controls.Count >= 1 Then
 '        Set cbc = cb.Controls(1)
 '        cbc.BeginGroup = True
