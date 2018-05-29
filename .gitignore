@@ -12,4 +12,5 @@ dist/
 .idea/
 
 # App
-instance/*.*
+
+python/env/*.*

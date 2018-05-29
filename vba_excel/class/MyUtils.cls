@@ -89,6 +89,7 @@ Function RemoveCommentsFromRange(rng)
     End If
 End Function
 
+
 '############################################################################################
 ' Register OnAction Attribute to Button, Shape etc
 ' ############################################################################################
@@ -192,7 +193,7 @@ On Error GoTo errHandler
             IgnorePrintAreas:=False, _
             OpenAfterPublish:=False
 
-        MsgBox "PDF file has been successfully created ! ", vbOKOnly, "( / °__°)/ "
+        MsgBox "PDF file has been successfully created ! ", vbOKOnly, "( / ï¿½__ï¿½)/ "
     End If
 
 exitHandler:
@@ -230,7 +231,7 @@ On Error GoTo errHandler
     ActiveWindow.SelectedSheets.PrintOut FROM:=1, To:=1, Copies:=1, Collate _
     :=True
 
-    MsgBox "Your Printint Command has been sent to the printer", vbOKOnly, "( / °__°)/ "
+    MsgBox "Your Printint Command has been sent to the printer", vbOKOnly, "( / ï¿½__ï¿½)/ "
 
 exitHandler:
     Exit Sub
@@ -297,6 +298,7 @@ Private Function GetUsedRangeIncShapeChart(target As Worksheet, _
     End With
 
 End Function
+
 
 '############################################################################################
 ' Get File Path and File Name From Full Path String

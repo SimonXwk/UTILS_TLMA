@@ -53,10 +53,11 @@ digit AS (
 ,cte_payments as (
   select bsp.SERIALNUMBER,bsp.ADMITNAME,bsp.RECEIPTNO,bsp.PAYMENTAMOUNT,bsp.GSTAMOUNT,bsp.SOURCECODE,bsp.SOURCECODE2,bsp.DESTINATIONCODE,bsp.DESTINATIONCODE2
     ,sc.SOURCETYPE,sc.ADDITIONALCODE1 as QBCODE,sc.ADDITIONALCODE5 as QBCLASS,sc.ADDITIONALCODE3 as CAMPAIGN
-    ,btm.DATEOFPAYMENT,btm.PAYMENTTYPE,btm.MANUALRECEIPTNO,btm.REVERSED
+    ,btm.DATEOFPAYMENT,btm.PAYMENTTYPE,btm.CREDITCARDTYPE,btm.MANUALRECEIPTNO,btm.REVERSED
     ,bpl.PLEDGEID,bpl.PLEDGELINENO
     ,bhr.APPROVED
-    ,IIF(sc.SOURCETYPE like 'Merch%','Merchandise Platform','Non-Merch Platform') as PLATFORM
+    ,IIF(sc.SOURCETYPE like 'Merch%','Merch Platform','NonM Platform') as PLATFORM
+    ,TRXID = dense_rank() over (partition by bsp.SERIALNUMBER order by btm.DATEOFPAYMENT asc, concat(bsp.ADMITNAME,bsp.RECEIPTNO) asc)
   from 
     Tbl_BATCHITEMSPLIT bsp
     left join Tbl_SOURCECODE sc on (bsp.SOURCECODE=sc.SOURCECODE)
@@ -69,10 +70,10 @@ digit AS (
 
 -- *****************************************************************
 select
-  PLATFORM,
-  sum(PAYMENTAMOUNT)
+  *
 from 
   cte_payments
-group by 
-  PLATFORM
+where 
+  SERIALNUMBER = '0301167'
+-- for xml path('')
 
