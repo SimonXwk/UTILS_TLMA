@@ -10,7 +10,8 @@ dist/
 
 # Editor / Os
 .idea/
+.vscode
 
 # App
 
-python/env/*.*
+python/env/

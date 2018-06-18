@@ -1,5 +1,3 @@
-USE thankQ3_Reporter
-;
 WITH
 cte_sourcecode AS (
     SELECT

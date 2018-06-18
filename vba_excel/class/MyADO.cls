@@ -262,17 +262,53 @@ Function IsRecordsetEmpty() As Boolean
     End If
 End Function
 
+Function IsRecordsetNotEmpty() As Boolean
+    ' The BOF property returns True when the current position is before the first record.
+    ' Similarly, EOF returns True when the current position is just beyond the last record.
+    ' If both properties are True simultaneously, the Recordset is empty.
+    If rs.BOF And rs.EOF Then
+        IsRecordsetNotEmpty = False
+    Else
+        IsRecordsetNotEmpty = True
+    End If
+End Function
+
 ' -----------------------------------------------------------
 ' Copy Record Set to Rang
 ' -----------------------------------------------------------
-Function TransferResultToRange(LeftTopCell, Optional WthHeaderAbove As Boolean = False) As Boolean
-    If WthHeaderAbove Then
-        For i = 1 To rs.Fields.Count
-            LeftTopCell.offset(-1, i - 1) = rs.Fields(i - 1).name
-        Next i
-        LeftTopCell.CopyFromRecordset rs
+Function TransferResultToRange(LeftTopCell As Range, Optional WithHeader As Boolean = False, Optional Transpose As Boolean = False)
+    If Transpose Then
+        Dim result As Variant
+        result = rs.GetRows
+        If WithHeader Then
+            If LeftTopCell.Cells(1).Column > 1 Then
+                For i = 1 To rs.Fields.Count
+                    LeftTopCell.Offset(i - 1, -1) = rs.Fields(i - 1).name
+                Next i
+            Else
+                MsgBox "Can not created a header line left for the query result in the first column"
+            End If
+        Else
+            ' UBound( ArrayName, [Dimension] )
+            ' Dimension 1 : columns, Dimension 2 : rows
+            LeftTopCell.Resize(UBound(result, 1) - LBound(result, 1) + 1, UBound(result, 2) - LBound(result, 2) + 1) = result
+        
+        End If
     Else
-        LeftTopCell.CopyFromRecordset rs
+    ' No transpose
+        If WithHeader Then
+            If LeftTopCell.Cells(1).Row > 1 Then
+                For i = 1 To rs.Fields.Count
+                    LeftTopCell.Offset(-1, i - 1) = rs.Fields(i - 1).name
+                Next i
+            Else
+                MsgBox "Can not created a header line above for the query result in the first row"
+            End If
+            
+            LeftTopCell.CopyFromRecordset rs
+        Else
+            LeftTopCell.CopyFromRecordset rs
+        End If
     End If
 End Function
 
