@@ -7,6 +7,9 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
+' -----------------------------------------------------------
+' Remember to reference the ADO library from your project
+' -----------------------------------------------------------
 Private cnn As ADODB.Connection
 Private rs As ADODB.Recordset
 Private thisConnectionString As String
@@ -69,10 +72,16 @@ End Function
 ' Open Connection
 ' -----------------------------------------------------------
  Public Function Connect(connString As String)
-    ' Close Connection
+    ' Close Current Connection
     TearDownConnection
-    Set cnn = New ADODB.Connection
-    ' Open Connection
+    ' Setup a new connection
+    Set cnn = New ADODB.Connection  
+    ' Or use CreateObject method: Objects instantiated with CreateObject are late-bound, 
+    ' which means that they are not strongly typed and command-line completion is disabled.
+    ' Instantiating objects by using the CreateObject method is typically slower than using the Dim statement(Dim cnn As ADODB.Connection).
+    ' Dim cnn
+    ' Set cnn = CreateObject("ADODB.Connection")
+    ' Open Connection using given connection string
     With cnn
         .ConnectionString = connString
         .Open
@@ -84,7 +93,12 @@ End Function
 ' -----------------------------------------------------------
 Sub Query(sqlScript As String)
     TearDownRecordset
-    Set rs = New ADODB.Recordset
+    Set rs = New ADODB.Recordset  
+    ' Or use CreateObject method: Objects instantiated with CreateObject are late-bound, 
+    ' which means that they are not strongly typed and command-line completion is disabled.
+    ' Instantiating objects by using the CreateObject method is typically slower than using the Dim statement(Dim rs As ADODB.Recordset).
+    ' Dim rs
+    ' Set rs = CreateObject("ADODB.Recordset")
     With rs
         .CursorLocation = adUseClient
         .Open sqlScript, cnn, adOpenKeyset, adLockOptimistic
@@ -92,7 +106,7 @@ Sub Query(sqlScript As String)
 End Sub
 
 ' -----------------------------------------------------------
-' Config Connection String to ThankQ (currenv version 4)
+' Build a Connection String to ThankQ (currenv version 4)
 ' -----------------------------------------------------------
 Public Function BuildConnectionString_ThankQ() As String
     ' OLE DB Provider for ODBC Databases
@@ -117,7 +131,7 @@ Public Function BuildConnectionString_ThankQ() As String
 End Function
 
 ' -----------------------------------------------------------
-' Config Connection String to ThankQ (currenv version 4)
+' Build a Connection String to ThankQ (currenv version 4)
 ' -----------------------------------------------------------
 Public Function BuildConnectionString_ThankQRep() As String
     ' OLE DB Provider for ODBC Databases
@@ -142,7 +156,7 @@ Public Function BuildConnectionString_ThankQRep() As String
 End Function
 
 ' -----------------------------------------------------------
-' Config Connection String to This Workbook
+' Build a Connection String to This Workbook
 ' -----------------------------------------------------------
  Public Function BuildConnectionString_WorkbookThis() As String
 
@@ -166,7 +180,7 @@ End Function
 End Function
 
 ' -----------------------------------------------------------
-' Config Connection String to Active Workbook
+' Build a Connection String to Active Workbook
 ' -----------------------------------------------------------
 Public Function BuildConnectionString_WorkbookActive() As String
 
@@ -190,9 +204,9 @@ Public Function BuildConnectionString_WorkbookActive() As String
 End Function
 
 ' -----------------------------------------------------------
-' Config Connection String to Given Workbook
+' Build a Connection String to Given Workbook
 ' -----------------------------------------------------------
-Public Function BuildConnectionString_WorkbookExternal(externalFullPath As String) As String
+Public Function BuildConnectionString_WorkbookExternal(ExternalExcelFullPath As String) As String
     ' OLE DB Provider
 '    thisConnectionString = _
 '    "Provider=Microsoft.ACE.OLEDB.12.0;" & _
@@ -200,17 +214,16 @@ Public Function BuildConnectionString_WorkbookExternal(externalFullPath As Strin
 '            "Extended Properties=""Excel 12.0 Xml;HDR=YES;"";"
 
     ' ODBC Driver for Excel
-    strDataSource = externalFullPath
     thisConnectionString = _
            "Driver={Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)}" & ";" _
-           & "Dbq=" & strDataSource & ";" _
+           & "Dbq=" & ExternalExcelFullPath & ";" _
            & "ReadOnly=0" & ";"
            
     BuildConnectionString_WorkbookExternal = thisConnectionString
 End Function
 
 ' -----------------------------------------------------------
-' Config Connection String to CSV
+' Build a Connection String to CSV
 ' -----------------------------------------------------------
  Public Function BuildConnectionString_CSV(externalFullPath As String) As String
 
@@ -263,59 +276,47 @@ Function IsRecordsetEmpty() As Boolean
 End Function
 
 Function IsRecordsetNotEmpty() As Boolean
-    ' The BOF property returns True when the current position is before the first record.
-    ' Similarly, EOF returns True when the current position is just beyond the last record.
-    ' If both properties are True simultaneously, the Recordset is empty.
-    If rs.BOF And rs.EOF Then
-        IsRecordsetNotEmpty = False
-    Else
-        IsRecordsetNotEmpty = True
-    End If
+    IsRecordsetNotEmpty = Not IsRecordsetEmpty
 End Function
 
 ' -----------------------------------------------------------
 ' Copy Record Set to Rang
 ' -----------------------------------------------------------
 Function TransferResultToRange(LeftTopCell As Range, Optional WithHeader As Boolean = False, Optional Transpose As Boolean = False)
-    If Transpose Then
+    If Transpose Then  ' Transpose Query Result : Headers on Left Hand Side
         Dim result As Variant
         result = rs.GetRows
         If WithHeader Then
             If LeftTopCell.Cells(1).Column > 1 Then
-                For i = 1 To rs.Fields.Count
-                    LeftTopCell.Offset(i - 1, -1) = rs.Fields(i - 1).name
+                For i = 0 To rs.Fields.Count - 1
+                    LeftTopCell.Offset(i, -1) = rs.Fields(i).name
                 Next i
             Else
-                MsgBox "Can not created a header line left for the query result in the first column"
+                MsgBox "Can not created a header line to the left because the query result in the first column already"
             End If
-        Else
-            ' UBound( ArrayName, [Dimension] )
-            ' Dimension 1 : columns, Dimension 2 : rows
-            LeftTopCell.Resize(UBound(result, 1) - LBound(result, 1) + 1, UBound(result, 2) - LBound(result, 2) + 1) = result
-        
-        End If
-    Else
-    ' No transpose
+        End If  ' End of Creating Header
+        ' Copy query result to LeftTopCell by resziing it to the shape of transposed result
+        ' Please Note UBound and LBound Functions: UBound( ArrayName, [Dimension] ), [Dimension] : 1(rows), 2(columns)
+        LeftTopCell.Resize(UBound(result, 1) - LBound(result, 1) + 1, UBound(result, 2) - LBound(result, 2) + 1) = result
+    Else  ' No transpose : Headers from Top
         If WithHeader Then
             If LeftTopCell.Cells(1).Row > 1 Then
-                For i = 1 To rs.Fields.Count
-                    LeftTopCell.Offset(-1, i - 1) = rs.Fields(i - 1).name
+                For i = 0 To rs.Fields.Count - 1
+                    LeftTopCell.Offset(-1, i) = rs.Fields(i).name
                 Next i
             Else
-                MsgBox "Can not created a header line above for the query result in the first row"
-            End If
-            
-            LeftTopCell.CopyFromRecordset rs
-        Else
-            LeftTopCell.CopyFromRecordset rs
-        End If
+                MsgBox "Can not created a header line above because the query result in the first row"
+            End If        
+        End If  ' End of Creating Header
+        ' Copy query result to LeftTopCell
+        LeftTopCell.CopyFromRecordset rs
     End If
 End Function
 
 ' -----------------------------------------------------------
 ' Replace a certain part of the sql script with new value
 ' -----------------------------------------------------------
-Function ReplaceScriptParameter(ByVal srcText As String, newVal As String _
+Function ReplaceScriptParameter(ByVal srcText As String, parameter as String, newVal As String _
     , Optional ValueWrapper As String = vbNullString) As String
     ' How one parameter pair looks in the text
     Dim startParameter, endParameter As String
@@ -326,6 +327,7 @@ Function ReplaceScriptParameter(ByVal srcText As String, newVal As String _
     Dim oldParamVal, newParamVal As String
     oldParamVal = vbNullString
     newParamVal = ValueWrapper & newVal & ValueWrapper
+
     Dim oldPair, newPair As String
     newPair = startParameter & newParamVal & endParameter
     
@@ -335,11 +337,11 @@ Function ReplaceScriptParameter(ByVal srcText As String, newVal As String _
     max_chars_limit = 32767
     size_before = Len(srcText)
 
-    ' Counter of how many items found and how many of them processed
-    Dim itemsProcessed, itemsFound As Long
+    ' Counter of how many items found and how many of them processed (only if processed one by one)
+    ' Dim itemsProcessed, itemsFound As Long
     ' How many parameter locations has been found & changed
-    itemsFound = 0
-    itemsProcessed = 0
+    ' itemsFound = 0
+    ' itemsProcessed = 0
     
     ' Pointers
     Dim start_pointer, end_pointer As Long
@@ -352,16 +354,16 @@ Function ReplaceScriptParameter(ByVal srcText As String, newVal As String _
             ' Start Pointer Found, then try to find the following end pointer
             end_pointer = InStr(start_pointer + Len(startParameter), srcText, endParameter)
             If end_pointer Then
-            ' End Pointer Found, Replace the thing in between with 'newValue' ( By changing the whole SQL src )
+            ' First End Pointer Match Found, Replace the thing in between with 'newValue' ( By changing the whole SQL src )
                 ' Find both start and end parameter, you find a record
-                itemsFound = itemsFound + 1
+                ' itemsFound = itemsFound + 1
                 ' Indicate old value and new value
                 oldParamVal = Mid(srcText, start_pointer + Len(startParameter), end_pointer - start_pointer - Len(startParameter))
                 oldPair = startParameter & oldParamVal & endParameter
                 ' Replace all matched pairs
-                srcText = Replace(srcText, oldPair, newPair)   ' Methold [Two]
+                srcText = Replace(srcText, oldPair, newPair)
                 ' Processed One
-                itemsProcessed = itemsProcessed + 1
+                ' itemsProcessed = itemsProcessed + 1
                 Exit Do
             Else
                 ' Otherwise you only find start parameter but can not find any end parameter, stop processing the whole Text
@@ -374,6 +376,9 @@ Function ReplaceScriptParameter(ByVal srcText As String, newVal As String _
     Loop While start_pointer
     ' How big the text is now
     size_after = Len(srcText)
+    if size_after > max_chars_limit then
+        Debug.Print "Warning : Result might be too big to be stored in Excel's connectionn CommandText box, (Size:" & size_after & ")"
+    end if
     
     ' Briefing the result
 '    Debug.Print "Found " & CStr(itemsFound) & "  " & startParameter & endParameter & " Pairs and Processed " & CStr(itemsProcessed)

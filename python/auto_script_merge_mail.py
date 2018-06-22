@@ -156,7 +156,7 @@ def read_mail_daily_data(file=None):
 
             for row in vaild_rows:
               for key, cell in enumerate(row):
-                
+
                 if not cell.value is None and first_col <= key <= last_col:
                   data = (date_opened, sheet_info['column_type'][key][0], sheet_info['column_type']
                           [key][1], row[2].value, cell.value, opener, None, None)
