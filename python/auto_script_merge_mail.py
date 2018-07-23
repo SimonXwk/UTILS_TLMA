@@ -77,22 +77,22 @@ def read_mail_daily_data(file=None):
 
       daily_data = {
           'pre201611': {
-              'sheet_name_regex': '^[0-9][0-9]',
-              'range_address_format': 'A{}:Q{}',
-              'data_min_row': 8,
-              'column_type': {
-                  3: ('Donation', 'CashCheque'),
-                  4: ('Donation', 'CashCheque'),
-                  5: ('Donation', 'CashCheque'),
-                  6: ('Donation', 'CreditCard'),
-                  7: ('Donation', 'CreditCard'),
-                  8: ('Donation', 'CreditCard'),
-                  9: ('Merchandise', 'CashCheque'),
-                  10: ('Merchandise', 'CashCheque'),
-                  11: ('Merchandise', 'CreditCard'),
-                  12: ('Merchandise', 'CreditCard'),
-                  13: ('List', 'CashCheque'),
-                  14: ('Other', 'CashCheque')
+            'sheet_name_regex': '^[0-9][0-9]',
+            'range_address_format': 'A{}:Q{}',
+            'data_min_row': 8,
+            'column_type': {
+                3: ('Donation', 'CashCheque'),
+                4: ('Donation', 'CashCheque'),
+                5: ('Donation', 'CashCheque'),
+                6: ('Donation', 'CreditCard'),
+                7: ('Donation', 'CreditCard'),
+                8: ('Donation', 'CreditCard'),
+                9: ('Merchandise', 'CashCheque'),
+                10: ('Merchandise', 'CashCheque'),
+                11: ('Merchandise', 'CreditCard'),
+                12: ('Merchandise', 'CreditCard'),
+                13: ('List', 'CashCheque'),
+                14: ('Other', 'CashCheque')
               }
           },
           'post201611': {

@@ -101,7 +101,11 @@ Sub Query(sqlScript As String)
     ' Set rs = CreateObject("ADODB.Recordset")
     With rs
         .CursorLocation = adUseClient
-        .Open sqlScript, cnn, adOpenKeyset, adLockOptimistic
+        .ActiveConnection = cnn
+        .CursorType = adOpenKeyset
+        .LockType = adLockOptimistic
+        .Open sqlScript
+        ' .Open sqlScript, cnn, adOpenKeyset, adLockOptimistic
     End With
 End Sub
 
