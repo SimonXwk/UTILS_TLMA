@@ -8,9 +8,9 @@ WHERE (REVERSED IS NULL OR NOT (REVERSED = -1 OR REVERSED =1))
 -- ------------------------------------------------------------------------
 , cte_segments AS (
 SELECT SERIALNUMBER
-, [SEGMENT] = CONCAT(PARAMETERVALUE, '.',PARAMETERNOTE)
+, [SEGMENT] = CONCAT(PARAMETERVALUE,'.',PARAMETERNOTE)
 FROM TBL_CONTACTPARAMETER
-WHERE PARAMETERNAME LIKE 'FY2018'
+WHERE PARAMETERNAME LIKE 'FY2019'
 )
 
 -- ------------------------------------------------------------------------
@@ -18,19 +18,19 @@ WHERE PARAMETERNAME LIKE 'FY2018'
 SELECT *
   ,TRXIDDESC = IIF(REVERSED=2, 0, DENSE_RANK() OVER (PARTITION BY SERIALNUMBER ORDER BY DATEOFPAYMENT DESC,REVERSED ASC, RECEIPTNO DESC))
 FROM cte_batch_item
-WHERE DATEOFPAYMENT BETWEEN '2017/07/01' AND '2018/06/30' 
+WHERE DATEOFPAYMENT BETWEEN '2018/07/01' AND '2019/06/30' 
 )
 -- ------------------------------------------------------------------------
 , cte_batch_item_total_ltd AS (
 SELECT *
 FROM cte_batch_item
-WHERE DATEOFPAYMENT <= '2018/06/30' 
+WHERE DATEOFPAYMENT <= '2019/06/30' 
 )
 -- ------------------------------------------------------------------------
 , cte_batch_item_total_lfy AS (
 SELECT *
 FROM cte_batch_item
-WHERE DATEOFPAYMENT BETWEEN '2016/07/01' AND '2017/06/30' 
+WHERE DATEOFPAYMENT BETWEEN '2017/07/01' AND '2018/06/30' 
 )
 -- ------------------------------------------------------------------------
 , cte_sfy_stats AS (

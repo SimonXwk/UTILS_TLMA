@@ -1,8 +1,9 @@
+-- /*<BOLFY>*/'2017/07/01'/*</BOLFY>*/
+-- /*<EOLFY>*/'2018/06/30'/*</EOLFY>*/
 -- /*<BOFY>*/'2018/07/01'/*</BOFY>*/
 -- /*<EOFY>*/'2019/06/30'/*</EOFY>*/
--- 0
--- /*<BOLFY>*/'2017/07/01'/*</BOLFY>*/
--- /*<EOLFY>*/'2017/06/30'/*</EOLFY>*/
+-- /*<SEG>*/'FY2019'/*</SEG>*/
+
 
 SELECT t1.SerialNumber, 
 
@@ -138,7 +139,7 @@ AS LengthOfSupportYrs,
 (SELECT 
 COUNT(t16.SerialNumber)
 FROM tbl_BATCHITEM AS t16
-WHERE (t16.reversed is null or not (t16.reversed = -1 or t16.reversed =1 or t16.reversed =2)) AND (t1.SerialNumber=t16.SerialNumber) AND (t16.DateOfPayment BETWEEN /*<BOLFY>*/'2017/07/01'/*</BOLFY>*/  AND /*<EOLFY>*/'2017/06/30'/*</EOLFY>*/)
+WHERE (t16.reversed is null or not (t16.reversed = -1 or t16.reversed =1 or t16.reversed =2)) AND (t1.SerialNumber=t16.SerialNumber) AND (t16.DateOfPayment BETWEEN /*<BOLFY>*/'2018/07/01'/*</BOLFY>*/  AND /*<EOLFY>*/'2018/06/30'/*</EOLFY>*/)
 GROUP BY t16.SerialNumber
 )AS LFYTotalNo,
 

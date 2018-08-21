@@ -2,6 +2,11 @@
 *.py[cod]
 __pycache__/
 
+# Excel Files
+*.frx
+*.xlsx
+*.xls
+*.xlsm
 
 # Distribution / packaging
 env/
@@ -13,5 +18,4 @@ dist/
 .vscode
 
 # App
-
 python/env/

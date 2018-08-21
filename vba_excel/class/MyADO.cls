@@ -72,11 +72,12 @@ End Function
 ' Open Connection
 ' -----------------------------------------------------------
  Public Function Connect(connString As String)
+    If connString = "" Then Exit Function
     ' Close Current Connection
     TearDownConnection
     ' Setup a new connection
-    Set cnn = New ADODB.Connection  
-    ' Or use CreateObject method: Objects instantiated with CreateObject are late-bound, 
+    Set cnn = New ADODB.Connection
+    ' Or use CreateObject method: Objects instantiated with CreateObject are late-bound,
     ' which means that they are not strongly typed and command-line completion is disabled.
     ' Instantiating objects by using the CreateObject method is typically slower than using the Dim statement(Dim cnn As ADODB.Connection).
     ' Dim cnn
@@ -92,9 +93,10 @@ End Function
 ' Execute a SQL script
 ' -----------------------------------------------------------
 Sub Query(sqlScript As String)
+    If cnn Is Nothing Then Exit Sub
     TearDownRecordset
-    Set rs = New ADODB.Recordset  
-    ' Or use CreateObject method: Objects instantiated with CreateObject are late-bound, 
+    Set rs = New ADODB.Recordset
+    ' Or use CreateObject method: Objects instantiated with CreateObject are late-bound,
     ' which means that they are not strongly typed and command-line completion is disabled.
     ' Instantiating objects by using the CreateObject method is typically slower than using the Dim statement(Dim rs As ADODB.Recordset).
     ' Dim rs
@@ -108,6 +110,21 @@ Sub Query(sqlScript As String)
         ' .Open sqlScript, cnn, adOpenKeyset, adLockOptimistic
     End With
 End Sub
+
+' -----------------------------------------------------------
+' Build a Query Area String
+' -----------------------------------------------------------
+Public Function GetQueryAreaStringFromRange(sheet As Worksheet, Optional defaultFirstRow As Long = 1, Optional defaultFirstColumn As Long = 1) As String
+    Dim firstRow, firstColumn, lastRow, lastColumn As Long
+    With sheet
+        ' Calculate Vanilla Used Range
+        firstRow = IIf(.UsedRange.Cells(1).Row >= defaultFirstRow, .UsedRange.Cells(1).Row, defaultFirstRow)
+        firstColumn = IIf(.UsedRange.Cells(1).Column >= defaultFirstColumn, .UsedRange.Cells(1).Column, defaultFirstColumn)
+        lastRow = IIf(.UsedRange.Cells(.UsedRange.Cells.Count).Row >= defaultFirstRow, .UsedRange.Cells(.UsedRange.Cells.Count).Row, defaultFirstRow)
+        lastColumn = IIf(.UsedRange(.UsedRange.Cells.Count).Column >= defaultFirstColumn, .UsedRange(.UsedRange.Cells.Count).Column, defaultFirstColumn)
+        GetQueryAreaStringFromRange = "[" & sheet.name & "$" & .Range(.Cells(firstRow, firstColumn), .Cells(lastRow, lastColumn)).Address(False, False) & "]"
+    End With
+End Function
 
 ' -----------------------------------------------------------
 ' Build a Connection String to ThankQ (currenv version 4)
@@ -217,6 +234,8 @@ Public Function BuildConnectionString_WorkbookExternal(ExternalExcelFullPath As 
 '            "Data Source=" & "'" & fullPath & "'" & ";" & _
 '            "Extended Properties=""Excel 12.0 Xml;HDR=YES;"";"
 
+    If Trim(ExternalExcelFullPath) = "" Then Exit Function
+
     ' ODBC Driver for Excel
     thisConnectionString = _
            "Driver={Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)}" & ";" _
@@ -269,10 +288,14 @@ End Function
 ' Check Result : Empty ?
 ' -----------------------------------------------------------
 Function IsRecordsetEmpty() As Boolean
+    If rs Is Nothing Then
+        IsRecordsetEmpty = True
+        Exit Function
+    End If
     ' The BOF property returns True when the current position is before the first record.
     ' Similarly, EOF returns True when the current position is just beyond the last record.
     ' If both properties are True simultaneously, the Recordset is empty.
-    If rs.BOF And rs.EOF Then
+    If (rs.BOF And rs.EOF) Then
         IsRecordsetEmpty = True
     Else
         IsRecordsetEmpty = False
@@ -284,43 +307,79 @@ Function IsRecordsetNotEmpty() As Boolean
 End Function
 
 ' -----------------------------------------------------------
-' Copy Record Set to Rang
+' Copy Record Set to Range
 ' -----------------------------------------------------------
-Function TransferResultToRange(LeftTopCell As Range, Optional WithHeader As Boolean = False, Optional Transpose As Boolean = False)
+Function TransferResultToRange(LeftTopCell As Range, Optional WithHeader As Boolean = False, Optional Transpose As Boolean = False, Optional ClearSheet As Boolean = False)
+    If ClearSheet Then LeftTopCell.Worksheet.UsedRange.Clear
+    
     If Transpose Then  ' Transpose Query Result : Headers on Left Hand Side
         Dim result As Variant
         result = rs.GetRows
         If WithHeader Then
-            If LeftTopCell.Cells(1).Column > 1 Then
-                For i = 0 To rs.Fields.Count - 1
-                    LeftTopCell.Offset(i, -1) = rs.Fields(i).name
-                Next i
-            Else
-                MsgBox "Can not created a header line to the left because the query result in the first column already"
-            End If
+            For i = 0 To rs.Fields.Count - 1
+                LeftTopCell.Offset(i, 0) = rs.Fields(i).name
+            Next i
+            Set LeftTopCell = LeftTopCell.Offset(0, 1)
         End If  ' End of Creating Header
         ' Copy query result to LeftTopCell by resziing it to the shape of transposed result
         ' Please Note UBound and LBound Functions: UBound( ArrayName, [Dimension] ), [Dimension] : 1(rows), 2(columns)
+        rs.MoveFirst
         LeftTopCell.Resize(UBound(result, 1) - LBound(result, 1) + 1, UBound(result, 2) - LBound(result, 2) + 1) = result
     Else  ' No transpose : Headers from Top
         If WithHeader Then
-            If LeftTopCell.Cells(1).Row > 1 Then
-                For i = 0 To rs.Fields.Count - 1
-                    LeftTopCell.Offset(-1, i) = rs.Fields(i).name
-                Next i
-            Else
-                MsgBox "Can not created a header line above because the query result in the first row"
-            End If        
+            For i = 0 To rs.Fields.Count - 1
+                LeftTopCell.Offset(0, i) = rs.Fields(i).name
+            Next i
+            ' Copy query result to LeftTopCell
+           Set LeftTopCell = LeftTopCell.Offset(1, 0)
         End If  ' End of Creating Header
         ' Copy query result to LeftTopCell
+        rs.MoveFirst
         LeftTopCell.CopyFromRecordset rs
     End If
+End Function
+
+
+' -----------------------------------------------------------
+' Copy Record Set to Table
+' -----------------------------------------------------------
+Function TransferResultToTable(ByRef tbl As ListObject, Optional UpdateHeader As Boolean = False)
+    With tbl
+        ' Clear the Table
+        .Range.Offset(1, 0).Clear
+        If UpdateHeader Then
+            ' Record the Headers
+            For i = 0 To rs.Fields.Count - 1
+                .HeaderRowRange.Cells(1, i + 1) = rs.Fields(i).name
+            Next i
+            
+            ' Clear Extra Columns
+            If .HeaderRowRange.Columns.Count > rs.Fields.Count Then
+                Dim extraCols As Range
+                Set extraCols = .HeaderRowRange.Resize(1, .HeaderRowRange.Columns.Count - rs.Fields.Count).Offset(0, rs.Fields.Count)
+                ' Resize the table rows and columns
+                .Resize .Range.Resize(rs.RecordCount + 1, rs.Fields.Count)
+                ' Clear Extra Colmns Remainings
+                extraCols.Clear
+                Set extraCols = Nothing
+            Else
+                ' Resize the table rows only
+                .Resize .Range.Resize(rs.RecordCount + 1, .HeaderRowRange.Columns.Count)
+            End If
+        Else
+            ' Resize the Table rows but keep all columns
+            .Resize .Range.Resize(rs.RecordCount + 1, .HeaderRowRange.Columns.Count)
+        End If
+        
+        ' Transfer the Result
+        .Range.Resize(1, 1).Offset(1, 0).CopyFromRecordset rs
+    End With
 End Function
 
 ' -----------------------------------------------------------
 ' Replace a certain part of the sql script with new value
 ' -----------------------------------------------------------
-Function ReplaceScriptParameter(ByVal srcText As String, parameter as String, newVal As String _
+Function ReplaceScriptParameter(ByVal srcText As String, parameter As String, newVal As String _
     , Optional ValueWrapper As String = vbNullString) As String
     ' How one parameter pair looks in the text
     Dim startParameter, endParameter As String
@@ -380,9 +439,9 @@ Function ReplaceScriptParameter(ByVal srcText As String, parameter as String, ne
     Loop While start_pointer
     ' How big the text is now
     size_after = Len(srcText)
-    if size_after > max_chars_limit then
+    If size_after > max_chars_limit Then
         Debug.Print "Warning : Result might be too big to be stored in Excel's connectionn CommandText box, (Size:" & size_after & ")"
-    end if
+    End If
     
     ' Briefing the result
 '    Debug.Print "Found " & CStr(itemsFound) & "  " & startParameter & endParameter & " Pairs and Processed " & CStr(itemsProcessed)

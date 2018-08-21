@@ -1,5 +1,5 @@
 Attribute VB_Name = "Utility_ChangeSQLParameter"
-Function ChangeSQLParameter(ByVal srcText As String, parameter As String, newValue As String _
+Function ChangeSQLParameter(ByVal srcText As String, parameter As String, newVal As String _
     , Optional ValueWrapper As String = vbNullString) As String
     ' How one parameter pair looks in the text
     Dim startParameter, endParameter As String
@@ -9,7 +9,7 @@ Function ChangeSQLParameter(ByVal srcText As String, parameter As String, newVal
     ' The New Value to replace the olnd value
     Dim oldParamVal, newParamVal As String
     oldParamVal = vbNullString
-    newParamVal = ValueWrapper & newVal & ValueWrappe
+    newParamVal = ValueWrapper & newVal & ValueWrapper
 
     Dim oldPair, newPair As String
     newPair = startParameter & newParamVal & endParameter

@@ -58,8 +58,8 @@ Function GetNamedValue(name) As Variant
 End Function
 Function GetNamedRange(name) As Range
     Dim dest As String
-    dest = ThisWorkbook.Names(NAME_SQL_LEGIT_PLEDGE).RefersTo
-    If Left(dest, 1) = "=" Then dest = Right(dest, Len(dest) - 1)
+    dest = ThisWorkbook.Names(name).RefersTo
+    If left(dest, 1) = "=" Then dest = Right(dest, Len(dest) - 1)
     Set GetNamedRange = Range(dest)
 End Function
 
@@ -245,7 +245,7 @@ End Sub
 ' ######################################################################
 ' Find out Active sheet's Used Rnage
 ' ######################################################################
-Private Function GetUsedRangeIncShapeChart(target As Worksheet, _
+Public Function GetUsedRangeIncShapeChart(Target As Worksheet, _
     Optional ignoreChart As Boolean = False, _
     Optional ignoreShape As Boolean = False) As Range
 
@@ -254,7 +254,7 @@ Private Function GetUsedRangeIncShapeChart(target As Worksheet, _
     Dim Chart As ChartObject
     Dim shape As shape
 
-    With target
+    With Target
         ' Calculate Vanilla Used Range
         firstRow = .UsedRange.Cells(1).Row
         firstColumn = .UsedRange.Cells(1).Column
@@ -304,13 +304,13 @@ End Function
 ' Get File Path and File Name From Full Path String
 ' Returns File Path and File Name in Array
 ' ############################################################################################
-Public Function SplitFullPath(fullPath As String, Optional noExt As Boolean = True) As String()
+Public Function SplitFullPath(FullPath As String, Optional noExt As Boolean = True) As String()
     Dim file, filename, fileExtension, filepath, result(3) As String
     Dim filePart, namePart As Variant
     
-    If Right(fullPath, 1) <> "\" And Len(fullPath) > 0 Then
+    If Right(FullPath, 1) <> "\" And Len(FullPath) > 0 Then
         ' Split the Reverse String into 2 parts from left by "\"
-        filePart = Split(StrReverse(fullPath), "\", 2)
+        filePart = Split(StrReverse(FullPath), "\", 2)
         file = StrReverse(filePart(0))
         filepath = StrReverse(filePart(1)) & "\"
         ' Split the Reverse String into 2 parts from left by "."
@@ -350,7 +350,7 @@ With fd
     .title = title
     
     ' Default Path
-    If Trim(default) <> vbNullString Then
+    If Trim(default) <> "" Then
         .InitialFileName = default
     Else
         .InitialFileName = ThisWorkbook.path & "\"
@@ -416,13 +416,22 @@ Function IsFileOpen(filename As String) As Boolean
        
 End Function
 
+'############################################################################################
+' Open a folder of given full path
+' Returns: no return
+' ############################################################################################
+Function OpenFolder(path As String)
+     Shell "C:\WINDOWS\explorer.exe """ & path & "", vbNormalFocus
+End Function
 
 '############################################################################################
 ' Open a workbook and copy the first sheet from it to the "LocalSheet"(range(A1) or first table) in Thisworkbook
 ' Returns: no return
 ' ############################################################################################
-Function ImportOneSheet(srcPath, srcWksIdx, destWks As Worksheet, _
-    Optional toTable As Boolean = False, Optional withTitle As Boolean = True, Optional toTableIdx As Byte = 1)
+Function ImportOneSheet(srcPath, srcWksIdx, destWks As Worksheet _
+    , Optional toTable As Boolean = False, Optional withTitle As Boolean = True, Optional toTableIdx As Byte = 1 _
+    )
+    If Trim(srcPath) = "" Then Exit Function
     Application.CutCopyMode = False
     
     Dim srcWb As Workbook
@@ -433,19 +442,19 @@ Function ImportOneSheet(srcPath, srcWksIdx, destWks As Worksheet, _
         ' Process the table
         With destWks.ListObjects(toTableIdx)
             ' Remove the Content
-            .Range.offset(1, 0).ClearContents
+            .Range.Offset(1, 0).ClearContents
             ' Shrink the Table
             If withTitle Then
                 .Resize .Range.Resize(3, .HeaderRowRange.Columns.Count)
                 ' Define Destination
-                Set destRng = .HeaderRowRange.Resize(1, 1).offset(0, 0)
+                Set destRng = .HeaderRowRange.Resize(1, 1).Offset(0, 0)
             Else
                 Dim beforeHeaderRng As Range
-                Set beforeHeaderRng = .HeaderRowRange.offset(0, 1)
+                Set beforeHeaderRng = .HeaderRowRange.Offset(0, 1)
                 .Resize .Range.Resize(3, 1)
                 beforeHeaderRng.Clear
                 ' Define Destination
-                Set destRng = .HeaderRowRange.Resize(1, 1).offset(1, 0)
+                Set destRng = .HeaderRowRange.Resize(1, 1).Offset(1, 0)
             End If
         End With
     Else
@@ -478,4 +487,18 @@ Function ImportOneSheet(srcPath, srcWksIdx, destWks As Worksheet, _
     Application.CutCopyMode = False
     Application.DisplayAlerts = True
 End Function
+
+'############################################################################################
+' Check If a Key Exists in a Collection
+' Returns: no return
+' ############################################################################################
+Function CollectionKeyExists(collection As collection, strKey As String) As Boolean
+    Dim var As Variant
+    On Error Resume Next
+    var = collection(strKey)
+    CollectionKeyExists = (Err.Number = 0)
+    Err.Clear
+End Function
+
+
 
