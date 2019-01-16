@@ -23,7 +23,7 @@ End Sub
 '############################################################################################
 '  Speed up Excel VBA Code
 ' ############################################################################################
-Function OptimizeVBA(isOn As Boolean)
+Function SilentMode(isOn As Boolean)
     With Application
         .ScreenUpdating = Not (isOn)
         .Calculation = IIf(isOn, xlCalculationManual, xlCalculationAutomatic)
@@ -41,7 +41,7 @@ End Function
 ' General Error Handler Function
 ' ############################################################################################
 Function ErrorHandler_General()
-    OptimizeVBA False
+    SilentMode False
     
     MsgBox "Error occured at line " & CStr(Err.Number) & " : " _
         & vbNewLine & CStr(Err.Source) _
@@ -54,12 +54,15 @@ End Function
 ' Read a Value From a Name
 ' ############################################################################################
 Function GetNamedValue(name) As Variant
-    GetNamedValue = Excel.Evaluate(ThisWorkbook.Names(CStr(name)).Value)
+    GetNamedValue = Excel.Evaluate(ThisWorkbook.Names(CStr(name)).value)
+End Function
+Function SetNamedValue(name As String, value As Variant, Optional InQuote As Boolean = False)
+    ThisWorkbook.Names(CStr(name)).RefersTo = "=" & IIf(InQuote, """", vbNullString) & CStr(value) & IIf(InQuote, """", vbNullString)
 End Function
 Function GetNamedRange(name) As Range
     Dim dest As String
     dest = ThisWorkbook.Names(name).RefersTo
-    If left(dest, 1) = "=" Then dest = Right(dest, Len(dest) - 1)
+    If Left(dest, 1) = "=" Then dest = Right(dest, Len(dest) - 1)
     Set GetNamedRange = Range(dest)
 End Function
 
@@ -89,6 +92,40 @@ Function RemoveCommentsFromRange(rng)
     End If
 End Function
 
+
+'############################################################################################
+' Add Comments From A Cell
+' ############################################################################################
+Function AddCommentsToRange(rng As Range, text As String _
+    , Optional Top As Double _
+    , Optional Left As Double _
+    , Optional Overwrite As Boolean = False _
+    , Optional AutoSize As Boolean = True _
+    , Optional Visible As Boolean = False _
+    )
+    Dim cell As Range
+    For Each cell In rng
+        ' IF Comment Exists
+        If Not (cell.Comment Is Nothing) Then
+            If Overwrite Then
+                cell.Comment.Delete
+            Else
+                GoTo EndLoop
+            End If
+        End If
+        ' Add Comment
+        With cell
+            .AddComment text
+            With .Comment
+                .Visible = Visible
+                .shape.TextFrame.AutoSize = True
+                .shape.Top = IIf(Top, Top, cell.Top)
+                .shape.Left = IIf(Left, Left, cell.Offset(0, 1).Left - .shape.width)
+            End With
+        End With
+EndLoop:
+    Next cell
+End Function
 
 '############################################################################################
 ' Register OnAction Attribute to Button, Shape etc
@@ -162,7 +199,7 @@ On Error GoTo errHandler
     ' Set Path to the current workbook's path, ending with "\"
     Dim strPath, strName, strFileFullPath As String
     Dim myFile As Variant
-    strPath = ThisWorkbook.path
+    strPath = ThisWorkbook.Path
     strPath = IIf(Right(strPath, 1) <> "\", strPath + "\", strPath)
 
     ' Set File Name
@@ -228,7 +265,7 @@ On Error GoTo errHandler
 
     wks.PageSetup.PrintArea = outputRange.Address
 
-    ActiveWindow.SelectedSheets.PrintOut FROM:=1, To:=1, Copies:=1, Collate _
+    ActiveWindow.SelectedSheets.PrintOut from:=1, to:=1, Copies:=1, Collate _
     :=True
 
     MsgBox "Your Printint Command has been sent to the printer", vbOKOnly, "( / �__�)/ "
@@ -256,21 +293,21 @@ Public Function GetUsedRangeIncShapeChart(Target As Worksheet, _
 
     With Target
         ' Calculate Vanilla Used Range
-        firstRow = .UsedRange.Cells(1).Row
+        firstRow = .UsedRange.Cells(1).row
         firstColumn = .UsedRange.Cells(1).Column
-        lastRow = .UsedRange.Cells(.UsedRange.Cells.Count).Row
+        lastRow = .UsedRange.Cells(.UsedRange.Cells.Count).row
         lastColumn = .UsedRange(.UsedRange.Cells.Count).Column
         
         ' Calculate Chart Used Range
         If Not ignoreChart Then
             For Each Chart In .ChartObjects
                 With Chart
-                    If .TopLeftCell.Row < firstRow Then _
-                        firstRow = .TopLeftCell.Row
+                    If .TopLeftCell.row < firstRow Then _
+                        firstRow = .TopLeftCell.row
                     If .TopLeftCell.Column < firstColumn Then _
                         firstColumn = .TopLeftCell.Column
-                    If .BottomRightCell.Row > lastRow Then _
-                        lastRow = .BottomRightCell.Row
+                    If .BottomRightCell.row > lastRow Then _
+                        lastRow = .BottomRightCell.row
                     If .BottomRightCell.Column > lastColumn Then _
                         lastColumn = .BottomRightCell.Column
                 End With
@@ -279,14 +316,14 @@ Public Function GetUsedRangeIncShapeChart(Target As Worksheet, _
         
         ' Calculate Shape Used Range
         If Not ignoreShape Then
-             For Each shape In .shapes
+             For Each shape In .Shapes
                 With shape
-                    If .TopLeftCell.Row < firstRow Then _
-                        firstRow = .TopLeftCell.Row
+                    If .TopLeftCell.row < firstRow Then _
+                        firstRow = .TopLeftCell.row
                     If .TopLeftCell.Column < firstColumn Then _
                         firstColumn = .TopLeftCell.Column
-                    If .BottomRightCell.Row > lastRow Then _
-                        lastRow = .BottomRightCell.Row
+                    If .BottomRightCell.row > lastRow Then _
+                        lastRow = .BottomRightCell.row
                     If .BottomRightCell.Column > lastColumn Then _
                         lastColumn = .BottomRightCell.Column
                 End With
@@ -304,22 +341,27 @@ End Function
 ' Get File Path and File Name From Full Path String
 ' Returns File Path and File Name in Array
 ' ############################################################################################
-Public Function SplitFullPath(FullPath As String, Optional noExt As Boolean = True) As String()
+Public Function SplitFullPath(fullPath As String, Optional NoExtensionName As Boolean = True) As String()
     Dim file, filename, fileExtension, filepath, result(3) As String
     Dim filePart, namePart As Variant
     
-    If Right(FullPath, 1) <> "\" And Len(FullPath) > 0 Then
+    If Right(fullPath, 1) <> "\" And Len(fullPath) > 0 Then
         ' Split the Reverse String into 2 parts from left by "\"
-        filePart = Split(StrReverse(FullPath), "\", 2)
+        filePart = Split(StrReverse(fullPath), "\", 2)
         file = StrReverse(filePart(0))
-        filepath = StrReverse(filePart(1)) & "\"
+        If UBound(filePart) = LBound(filePart) Then
+            filepath = vbNullString
+        Else
+            filepath = StrReverse(filePart(1)) & "\"
+        End If
+        
         ' Split the Reverse String into 2 parts from left by "."
         namePart = Split(StrReverse(file), ".", 2)
         fileExtension = StrReverse(namePart(0))
         filename = StrReverse(namePart(1))
         ' Return the result
         result(0) = filepath
-        result(1) = IIf(noExt, filename, file)
+        result(1) = IIf(NoExtensionName, filename, file)
         result(2) = fileExtension
     Else
         result(0) = vbNullString
@@ -353,11 +395,11 @@ With fd
     If Trim(default) <> "" Then
         .InitialFileName = default
     Else
-        .InitialFileName = ThisWorkbook.path & "\"
+        .InitialFileName = ThisWorkbook.Path & "\"
     End If
 
     ' Clear out the current filters, and add our own.
-    .Filters.Clear
+    .Filters.clear
     .Filters.Add "Excel", "*.xls; *.xlsx; *.xlsm; *.xlsb; *.csv"
     .Filters.Add "All Files", "*.*"
 
@@ -420,8 +462,8 @@ End Function
 ' Open a folder of given full path
 ' Returns: no return
 ' ############################################################################################
-Function OpenFolder(path As String)
-     Shell "C:\WINDOWS\explorer.exe """ & path & "", vbNormalFocus
+Function OpenFolder(Path As String)
+     Shell "C:\WINDOWS\explorer.exe """ & Path & "", vbNormalFocus
 End Function
 
 '############################################################################################
@@ -445,14 +487,14 @@ Function ImportOneSheet(srcPath, srcWksIdx, destWks As Worksheet _
             .Range.Offset(1, 0).ClearContents
             ' Shrink the Table
             If withTitle Then
-                .Resize .Range.Resize(3, .HeaderRowRange.Columns.Count)
+                .Resize .Range.Resize(3, .HeaderRowRange.columns.Count)
                 ' Define Destination
                 Set destRng = .HeaderRowRange.Resize(1, 1).Offset(0, 0)
             Else
                 Dim beforeHeaderRng As Range
                 Set beforeHeaderRng = .HeaderRowRange.Offset(0, 1)
                 .Resize .Range.Resize(3, 1)
-                beforeHeaderRng.Clear
+                beforeHeaderRng.clear
                 ' Define Destination
                 Set destRng = .HeaderRowRange.Resize(1, 1).Offset(1, 0)
             End If
@@ -460,7 +502,7 @@ Function ImportOneSheet(srcPath, srcWksIdx, destWks As Worksheet _
     Else
         With destWks.UsedRange
             ' Remove the Content
-            .Clear
+            .clear
             ' Define Destination
             Set destRng = destWks.Range("A1")
         End With
@@ -497,7 +539,20 @@ Function CollectionKeyExists(collection As collection, strKey As String) As Bool
     On Error Resume Next
     var = collection(strKey)
     CollectionKeyExists = (Err.Number = 0)
-    Err.Clear
+    Err.clear
+End Function
+
+
+'############################################################################################
+' Remove Extra Spaces between word in string
+' Returns: String
+' ############################################################################################
+Function RemoveExtraSpaceFromString(str As String) As String
+    With CreateObject("VBScript.RegExp")
+        .pattern = "\s+"
+        .Global = True
+        RemoveExtraSpaceFromString = .Replace(str, " ")
+    End With
 End Function
 
 

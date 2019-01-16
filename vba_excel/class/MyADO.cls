@@ -16,17 +16,6 @@ Private thisConnectionString As String
 Private strProvider, strDataSrc, strExtendedProperties As String
 
 ' -----------------------------------------------------------
-' Properties
-' -----------------------------------------------------------
-Public Property Get Recordset() As ADODB.Recordset
-    Set Recordset = rs
-End Property
-
-Public Property Get Connection() As ADODB.Connection
-    Set Connection = cnn
-End Property
-
-' -----------------------------------------------------------
 ' Initializing
 ' -----------------------------------------------------------
 Private Sub Class_Initialize()
@@ -38,6 +27,17 @@ End Sub
 Private Sub Class_Terminate()
     TearDown
 End Sub
+
+' -----------------------------------------------------------
+' Properties
+' -----------------------------------------------------------
+Public Property Get Recordset() As ADODB.Recordset
+    Set Recordset = rs
+End Property
+
+Public Property Get Connection() As ADODB.Connection
+    Set Connection = cnn
+End Property
 
 ' -----------------------------------------------------------
 ' Destory Everything
@@ -118,11 +118,21 @@ Public Function GetQueryAreaStringFromRange(sheet As Worksheet, Optional default
     Dim firstRow, firstColumn, lastRow, lastColumn As Long
     With sheet
         ' Calculate Vanilla Used Range
-        firstRow = IIf(.UsedRange.Cells(1).Row >= defaultFirstRow, .UsedRange.Cells(1).Row, defaultFirstRow)
+        firstRow = IIf(.UsedRange.Cells(1).row >= defaultFirstRow, .UsedRange.Cells(1).row, defaultFirstRow)
         firstColumn = IIf(.UsedRange.Cells(1).Column >= defaultFirstColumn, .UsedRange.Cells(1).Column, defaultFirstColumn)
-        lastRow = IIf(.UsedRange.Cells(.UsedRange.Cells.Count).Row >= defaultFirstRow, .UsedRange.Cells(.UsedRange.Cells.Count).Row, defaultFirstRow)
+        lastRow = IIf(.UsedRange.Cells(.UsedRange.Cells.Count).row >= defaultFirstRow, .UsedRange.Cells(.UsedRange.Cells.Count).row, defaultFirstRow)
         lastColumn = IIf(.UsedRange(.UsedRange.Cells.Count).Column >= defaultFirstColumn, .UsedRange(.UsedRange.Cells.Count).Column, defaultFirstColumn)
-        GetQueryAreaStringFromRange = "[" & sheet.name & "$" & .Range(.Cells(firstRow, firstColumn), .Cells(lastRow, lastColumn)).Address(False, False) & "]"
+        GetQueryAreaStringFromRange = "[" & .name & "$" & .Range(.Cells(firstRow, firstColumn), .Cells(lastRow, lastColumn)).Address(False, False) & "]"
+    End With
+End Function
+
+' -----------------------------------------------------------
+' Build a Query Area String
+' -----------------------------------------------------------
+Public Function GetQueryAreaStringFromTable(sheet As Worksheet, Optional tableNameOrIndex As Variant = 1) As String
+    With sheet
+        ' Calculate Vanilla Used Range
+        GetQueryAreaStringFromTable = "[" & .name & "$" & .ListObjects(tableNameOrIndex).Range.Address(False, False) & "]"
     End With
 End Function
 
@@ -143,7 +153,7 @@ Public Function BuildConnectionString_ThankQ() As String
     thisConnectionString = _
             "Provider=sqloledb;" & _
             "Network Library=DBMSSOCN;" & _
-            "Data Source=192.168.0.23,1433;" & _
+            "Data Source=192.168.0.31,1433;" & _
             "Initial Catalog=thankQ4_Reporter;" & _
             "User Id=thankQ;" & _
             "Password=thankQ;"
@@ -168,7 +178,7 @@ Public Function BuildConnectionString_ThankQRep() As String
     thisConnectionString = _
             "Provider=sqloledb;" & _
             "Network Library=DBMSSOCN;" & _
-            "Data Source=192.168.0.27,1433;" & _
+            "Data Source=192.168.0.23,1433;" & _
             "Initial Catalog=thankQ4_Reporter2;" & _
             "User Id=thankQ;" & _
             "Password=thankQ;"
@@ -191,7 +201,7 @@ End Function
 '            & "Extended Properties=" & strExtendedProperties & ";"
     
     ' ODBC Driver for Excel
-    strDataSource = ThisWorkbook.path & Application.PathSeparator & ThisWorkbook.name
+    strDataSource = ThisWorkbook.Path & Application.PathSeparator & ThisWorkbook.name
     thisConnectionString = _
            "Driver={Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)}" & ";" _
            & "Dbq=" & strDataSource & ";" _
@@ -215,7 +225,7 @@ Public Function BuildConnectionString_WorkbookActive() As String
 '            & "Extended Properties=" & strExtendedProperties & ";"
 
     ' ODBC Driver for Excel
-    strDataSource = ActiveWorkbook.path & Application.PathSeparator & ActiveWorkbook.name
+    strDataSource = ActiveWorkbook.Path & Application.PathSeparator & ActiveWorkbook.name
     thisConnectionString = _
            "Driver={Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)}" & ";" _
            & "Dbq=" & strDataSource & ";" _
@@ -309,8 +319,13 @@ End Function
 ' -----------------------------------------------------------
 ' Copy Record Set to Range
 ' -----------------------------------------------------------
-Function TransferResultToRange(LeftTopCell As Range, Optional WithHeader As Boolean = False, Optional Transpose As Boolean = False, Optional ClearSheet As Boolean = False)
-    If ClearSheet Then LeftTopCell.Worksheet.UsedRange.Clear
+Function TransferResultToRange(LeftTopCell As Range _
+    , Optional WithHeader As Boolean = False _
+    , Optional Transpose As Boolean = False _
+    , Optional ClearSheet As Boolean = False _
+    )
+    rs.MoveFirst
+    If ClearSheet Then LeftTopCell.Worksheet.UsedRange.clear
     
     If Transpose Then  ' Transpose Query Result : Headers on Left Hand Side
         Dim result As Variant
@@ -343,36 +358,39 @@ End Function
 ' -----------------------------------------------------------
 ' Copy Record Set to Table
 ' -----------------------------------------------------------
-Function TransferResultToTable(ByRef tbl As ListObject, Optional UpdateHeader As Boolean = False)
+Function TransferResultToTable(ByRef tbl As ListObject _
+    , Optional ResetTable As Boolean = True _
+    , Optional UpdateHeader As Boolean = True _
+    , Optional AddToBottom As Boolean = False _
+    )
+    rs.MoveFirst
     With tbl
-        ' Clear the Table
-        .Range.Offset(1, 0).Clear
+        ' Reset the Table
+        If ResetTable Then
+            ' Clear Everything
+            .Range.Offset(1, 0).clear
+            .HeaderRowRange.ClearContents
+            If .HeaderRowRange.columns.Count > rs.Fields.Count Then
+                Dim extraCols As Range
+                Set extraCols = .HeaderRowRange.Resize(1, .HeaderRowRange.columns.Count - rs.Fields.Count).Offset(0, rs.Fields.Count)
+                .Resize .Range.Resize(rs.RecordCount + 1, rs.Fields.Count)
+                extraCols.clear
+            Else
+                .Resize .Range.Resize(rs.RecordCount + 1, rs.Fields.Count)
+            End If
+        End If
+        
+        ' Update Header
         If UpdateHeader Then
             ' Record the Headers
             For i = 0 To rs.Fields.Count - 1
                 .HeaderRowRange.Cells(1, i + 1) = rs.Fields(i).name
             Next i
-            
-            ' Clear Extra Columns
-            If .HeaderRowRange.Columns.Count > rs.Fields.Count Then
-                Dim extraCols As Range
-                Set extraCols = .HeaderRowRange.Resize(1, .HeaderRowRange.Columns.Count - rs.Fields.Count).Offset(0, rs.Fields.Count)
-                ' Resize the table rows and columns
-                .Resize .Range.Resize(rs.RecordCount + 1, rs.Fields.Count)
-                ' Clear Extra Colmns Remainings
-                extraCols.Clear
-                Set extraCols = Nothing
-            Else
-                ' Resize the table rows only
-                .Resize .Range.Resize(rs.RecordCount + 1, .HeaderRowRange.Columns.Count)
-            End If
-        Else
-            ' Resize the Table rows but keep all columns
-            .Resize .Range.Resize(rs.RecordCount + 1, .HeaderRowRange.Columns.Count)
         End If
-        
+    
         ' Transfer the Result
-        .Range.Resize(1, 1).Offset(1, 0).CopyFromRecordset rs
+        if Not AddToBottom or 
+        .Range.Resize(1, 1).Offset(IIf(AddToBottom, .Range.rows.Count, 1), 0).CopyFromRecordset rs
     End With
 End Function
 

@@ -1,0 +1,222 @@
+WITH
+-- --------------------------------------------------------------
+ones AS ( 
+SELECT * FROM (VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)) AS numbers(x) 
+)
+-- --------------------------------------------------------------
+,generation_def AS(
+SELECT *
+FROM (VALUES
+    (0, 1824, 'ANCIENT', '01.AC')
+    ,(1825, 1844, 'EARLY COLONIAL', '02.EC')
+    ,(1845, 1864, 'MID COLONIAL', '03.MC')
+    ,(1865, 1884, 'LATE COLONIAL', '04.LC')
+    ,(1885, 1904, 'HARD TIMERS', '05.HT')
+    ,(1905, 1924, 'FEDERATION', '06.F')
+    ,(1925, 1944, 'SILENT', '07.S')
+    ,(1945, 1964, 'BABY BOOMERS', '08.BB')
+    ,(1965, 1979, 'GENERATION X', '09.X')
+    ,(1980, 1994, 'GENERATION Y', '10.Y')
+    ,(1995, 2009, 'GENERATION Z', '11.Z')
+    ,(2010, 9999, 'MILLENIALS', '12.M')  ) AS generation(y1,y2,gen,gen_abr) 
+)
+-- --------------------------------------------------------------
+,generation AS (
+SELECT CY=n.x, GEN=g.gen, GEN_ABR=g.gen_abr
+FROM
+    (SELECT x=1000*o1000.x + 100*o100.x + 10*o10.x + o1.x
+    FROM ones o1, ones o10, ones o100, ones o1000 ) n
+    LEFT JOIN generation_def g on(n.x>=g.y1 AND n.x<=g.y2)
+WHERE n.x BETWEEN 1 AND YEAR(CURRENT_TIMESTAMP)
+)
+-- --------------------------------------------------------------
+,cte_payments AS(
+  SELECT
+    B1.SERIALNUMBER,
+    B2.DATEOFPAYMENT,
+    B1.PAYMENTAMOUNT, B1.PAYMENTAMOUNTNETT, B1.GSTAMOUNT,
+    B1.SOURCECODE,
+    S1.SOURCETYPE,
+    CASE WHEN LTRIM(RTRIM(B2.MANUALRECEIPTNO)) LIKE '[0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+    THEN LTRIM(RTRIM(B2.MANUALRECEIPTNO))
+    ELSE
+      CASE WHEN B2.NOTES IS NOT NULL AND B2.NOTES LIKE '%REX Order Number: [0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]%'
+      THEN SUBSTRING(B2.NOTES, PATINDEX('%REX Order Number: [0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]%', B2.NOTES) + LEN('REX Order Number:') + 1, 11)
+      ELSE NULL
+      END
+    END AS [REXORDERID],
+    CASE WHEN B2.REVERSED IN (1, -1, 2)
+    THEN 0
+    ELSE DENSE_RANK() OVER(PARTITION BY CASE WHEN B2.REVERSED IN (1, -1, 2) THEN 0 ELSE -1 END ORDER BY CONCAT(CONVERT(VARCHAR(10), B2.DATEOFPAYMENT, 112), B2.SERIALNUMBER, B2.ADMITNAME, B2.RECEIPTNO) ASC)
+    END AS [TRANSACTIONID],
+    -- Note: For a merchandise order reference, PLEDGEID and EXTERNALREF seems to have the same reference to order id
+    CASE WHEN B3.PLEDGEID IS NULL AND B1.EXTERNALREF IS NOT NULL
+    THEN B1.EXTERNALREF
+    ELSE 
+      CASE WHEN B1.EXTERNALREF IS NULL AND B3.PLEDGEID IS NOT NULL
+      THEN B3.PLEDGEID
+      ELSE B3.PLEDGEID
+      END 
+    END AS [TQORDERID]
+    
+  FROM
+    TBL_BATCHITEMSPLIT            B1
+    LEFT JOIN TBL_BATCHITEM       B2 ON (B1.SERIALNUMBER = B2.SERIALNUMBER) AND (B1.RECEIPTNO = B2.RECEIPTNO) AND (B1.ADMITNAME = B2.ADMITNAME)
+    LEFT JOIN TBL_BATCHITEMPLEDGE B3 ON (B1.SERIALNUMBER = B3.SERIALNUMBER) AND (B1.RECEIPTNO = B3.RECEIPTNO) AND (B1.ADMITNAME = B3.ADMITNAME) AND (B1.LINEID = B3.LINEID)
+    LEFT JOIN TBL_BATCHHEADER     B4 ON (B2.ADMITNAME = B4.ADMITNAME)
+    LEFT JOIN Tbl_SOURCECODE      S1 ON (B1.SOURCECODE = S1.SOURCECODE)
+  WHERE
+    (B2.REVERSED IS NULL OR NOT(B2.REVERSED IN (1, -1)))
+    AND (B4.STAGE ='Batch Approved')
+    AND B2.DATEOFPAYMENT BETWEEN '20130101' AND CURRENT_TIMESTAMP
+)
+-- ---------------------------------------------------------------------------------
+,cte_product as (
+  SELECT PRODUCTID,
+    SUBSTRING(PRODUCTID, PATINDEX('%[x][0-9]%', PRODUCTID)+1, 255) AS [PRODUCTID_CLEAN],
+    PRODUCTTYPE,PRODUCTSUBTYPE,NAME,THEDESCRIPTION,COSTPRICE,SELLINGPRICE,GST,PRODUCTPICTURE
+  FROM TBL_PRODUCT
+)
+-- --------------------------------------------------------------
+,cte_order_detail as (
+  SELECT ADMITNAME,ORDERTYPE,PRODUCTID,
+    SUBSTRING(PRODUCTID, PATINDEX('%[x][0-9]%', PRODUCTID)+1, 255) AS [PRODUCTID_CLEAN],
+    SOURCECODE,LINETOTAL,
+    COSTPRICE,SELLINGPRICE,DISCOUNT,PERCENTDISCOUNT, ORDERED, DELIVERED
+  FROM TBL_ORDERDETAIL
+  WHERE ORDERTYPE = 'Customer'
+)
+-- --------------------------------------------------------------
+,cte_order_header as (
+  SELECT ADMITNAME,ORDERTYPE,ORDERDATE,SERIALNUMBER,SENDON,COMPLETED
+  FROM TBL_ORDERHEADER
+  WHERE ORDERTYPE = 'Customer'
+)
+-- ---------------------------------------------------------------------------------
+,cte_orders as (
+  SELECT 
+    o1.ADMITNAME, o1.SERIALNUMBER, o1.ORDERTYPE, o1.ORDERDATE, o1.SENDON, o1.COMPLETED
+    ,o2.SOURCECODE, o2.LINETOTAL, o2.COSTPRICE, o2.SELLINGPRICE, o2.DISCOUNT, o2.ORDERED, o2.DELIVERED
+    ,o3.PRODUCTTYPE, o3.PRODUCTSUBTYPE, o3.NAME, o3.THEDESCRIPTION,  o3.GST
+  FROM
+    TBL_ORDERHEADER o1
+    LEFT JOIN TBL_ORDERDETAIL o2 ON (o1.ADMITNAME = o2.ADMITNAME) 
+    LEFT JOIN TBL_PRODUCT o3 ON (o2.PRODUCTID = o3.PRODUCTID)
+  WHERE
+    o1.ORDERTYPE = 'Customer' AND o2.ORDERTYPE = 'Customer'
+)
+-- ---------------------------------------------------------------------------------
+,cte_rex_customerids as(
+  -- BY default one contact can only have one REXID
+  SELECT SERIALNUMBER
+  , [PARAMETERVALUE] AS [LAST_REXID]
+  , [REXIDS]
+  , [THQIDS] AS [LAST_REXID_POOL]
+  FROM (
+    SELECT [SERIALNUMBER], [PARAMETERVALUE]
+      , ROW_NUMBER() OVER(PARTITION BY [SERIALNUMBER] ORDER BY [CREATED] DESC) AS [PAT_SERIALNUMBER_ROW]
+      , COUNT(PARAMETERVALUE) OVER(PARTITION BY [SERIALNUMBER]) AS [REXIDS]
+      , COUNT(SERIALNUMBER) OVER(PARTITION BY [PARAMETERVALUE]) AS [THQIDS]
+  FROM TBL_CONTACTPARAMETER
+  WHERE [PARAMETERNAME] LIKE '%Customer%Number%'
+  ) tmp
+WHERE [PAT_SERIALNUMBER_ROW] = 1
+)
+
+-- ---------------------------------------------------------------------------------
+
+select 
+  t1.[TRANSACTIONID] AS [TQ_TRANSACTION_ID ]
+  ,t1.DATEOFPAYMENT AS [TQ_TRANSACTION_DATE]
+  ,t1.SERIALNUMBER AS [TQ_SERIALNUMBER]
+  ,m1.LAST_REXID AS [REX_CUSTOMERID]
+
+  ,CONCAT(
+    CASE WHEN RTRIM(ISNULL(c1.TITLE,''))='' THEN '' ELSE RTRIM(c1.TITLE) + ' ' END
+    ,CASE WHEN RTRIM(ISNULL(c1.FIRSTNAME,''))='' THEN '' ELSE RTRIM(c1.FIRSTNAME) + ' ' END
+    ,CASE WHEN RTRIM(ISNULL(c1.OTHERINITIAL,''))='' THEN '' ELSE RTRIM(c1.OTHERINITIAL) + ' ' END
+    ,CASE WHEN RTRIM(ISNULL(c1.KEYNAME,''))='' THEN '' ELSE RTRIM(c1.KEYNAME) END
+  ) AS [TQ_FULLNAME]
+  ,c1.CONTACTTYPE
+  ,c1.GENDER
+  ,c1.DATEOFBIRTH
+  ,m2.GEN AS [GENERATION]
+  ,c1.ADDRESSLINE4 AS [STATE]
+  
+  ,t1.SOURCETYPE
+  ,t1.SOURCECODE
+  -- ,o2.SOURCECODE AS [SOURCECODE_BY_ORDERDETAIL]
+  
+  ,SUM(t1.PAYMENTAMOUNT) AS [AMOUNT]
+  -- ,CASE WHEN o2.SOURCECODE IS NULL 
+  -- THEN  SUM(t1.PAYMENTAMOUNT)
+  -- ELSE SUM(o2.LINETOTAL)
+  -- END AS [AMOUNT]
+
+  ,t1.[REXORDERID] AS [REX_ORDER_ID]
+  ,CASE WHEN t1.[REXORDERID] IS NULL THEN NULL ELSE'AvailableInRexDataSheet' END  AS [REX_ORDER_DATE]
+
+  ,o1.ADMITNAME AS [TQ_ORDER_ID]
+  ,o1.ORDERDATE AS [TQ_ORDER_DATE]
+  
+  -- ,o3.PRODUCTID_CLEAN AS [TQ_PRODUCTID]
+  -- ,o3.NAME AS [TQ_PRODUCTNAME]
+  -- ,o3.THEDESCRIPTION AS [TQ_PRODUCTDESCRIPTION]
+  -- ,o3.PRODUCTTYPE  AS [TQ_PRODUCTTYPE]
+  -- ,o3.PRODUCTSUBTYPE  AS [TQ_PRODUCTSUBTYPE]
+
+
+  -- ,o2.COSTPRICE, o2.SELLINGPRICE, o2.DISCOUNT
+  -- ,o2.ORDERED
+  -- ,o2.DELIVERED
+
+from 
+  cte_payments t1
+  -- left join cte_order_detail o2 on(t1.TQORDERID = o2.ADMITNAME AND t1.SOURCECODE = o2.SOURCECODE )
+  left join cte_order_header o1 on (t1.TQORDERID = o1.ADMITNAME)
+  -- left join cte_product o3 on(o2.PRODUCTID_CLEAN = o3.PRODUCTID_CLEAN)
+  left join tbl_contact c1 on (t1.SERIALNUMBER = c1.SERIALNUMBER)
+  left join cte_rex_customerids m1 on (t1.SERIALNUMBER = m1.SERIALNUMBER)
+  left join generation m2 ON (YEAR(c1.DATEOFBIRTH) = m2.CY)
+where 
+  t1.SOURCETYPE like '%Merch%'
+group by 
+  t1.[TRANSACTIONID]
+  ,t1.[REXORDERID]
+  ,t1.DATEOFPAYMENT
+  ,t1.SERIALNUMBER
+
+  ,c1.TITLE ,c1.FIRSTNAME ,c1.OTHERINITIAL ,c1.KEYNAME
+  ,c1.CONTACTTYPE
+  ,c1.GENDER
+  ,c1.DATEOFBIRTH
+  ,c1.ADDRESSLINE4
+
+  ,m2.GEN
+
+  ,m1.LAST_REXID
+
+  ,t1.SOURCECODE
+  ,t1.SOURCETYPE
+
+  ,o1.ADMITNAME
+  ,o1.ORDERDATE
+
+  -- ,o2.COSTPRICE, o2.SELLINGPRICE, o2.DISCOUNT
+  -- ,o2.ORDERED
+  -- ,o2.DELIVERED
+  -- ,o2.SOURCECODE
+
+  -- ,o3.PRODUCTID_CLEAN
+  -- ,o3.NAME
+  -- ,o3.THEDESCRIPTION
+  -- ,o3.PRODUCTTYPE
+  -- ,o3.PRODUCTSUBTYPE
+
+order BY
+  t1.DATEOFPAYMENT
+
+
+-- ---------------------------------------------------------------------------------
+-- OPTION(RECOMPILE)
+-- ---------------------------------------------------------------------------------
