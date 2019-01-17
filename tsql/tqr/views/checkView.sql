@@ -1,10 +1,9 @@
 USE thankQ4_Reporter
 
--- SELECT * FROM sys.views
--- WHERE name LIKE '%View%'
+SELECT * FROM sys.views
+WHERE name LIKE 'SV_%' OR name LIKE 'View_%'
+ORDER BY create_date DESC
 
-
-select * from MyView_Payments
 
 
 -- select CAST(SERIALNUMBER AS VARCHAR(7)),PAYMENTAMOUNT,DATEOFPAYMENT,REVERSED,TRX_ID,TRX_ID2,TRX_ID3,lead(TRX_ID) OVER(ORDER BY TRX_ID )

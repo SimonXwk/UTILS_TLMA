@@ -1,12 +1,3 @@
-VERSION 1.0 CLASS
-BEGIN
-  MultiUse = -1  'True
-END
-Attribute VB_Name = "MyADO"
-Attribute VB_GlobalNameSpace = False
-Attribute VB_Creatable = False
-Attribute VB_PredeclaredId = False
-Attribute VB_Exposed = False
 ' -----------------------------------------------------------
 ' Remember to reference the ADO library from your project
 ' -----------------------------------------------------------
@@ -114,13 +105,13 @@ End Sub
 ' -----------------------------------------------------------
 ' Build a Query Area String
 ' -----------------------------------------------------------
-Public Function GetQueryAreaStringFromRange(sheet As Worksheet, Optional defaultFirstRow As Long = 1, Optional defaultFirstColumn As Long = 1) As String
+Public Function GetQueryAreaStringFromRange(Sheet As Worksheet, Optional defaultFirstRow As Long = 1, Optional defaultFirstColumn As Long = 1) As String
     Dim firstRow, firstColumn, lastRow, lastColumn As Long
-    With sheet
+    With Sheet
         ' Calculate Vanilla Used Range
-        firstRow = IIf(.UsedRange.Cells(1).row >= defaultFirstRow, .UsedRange.Cells(1).row, defaultFirstRow)
+        firstRow = IIf(.UsedRange.Cells(1).Row >= defaultFirstRow, .UsedRange.Cells(1).Row, defaultFirstRow)
         firstColumn = IIf(.UsedRange.Cells(1).Column >= defaultFirstColumn, .UsedRange.Cells(1).Column, defaultFirstColumn)
-        lastRow = IIf(.UsedRange.Cells(.UsedRange.Cells.Count).row >= defaultFirstRow, .UsedRange.Cells(.UsedRange.Cells.Count).row, defaultFirstRow)
+        lastRow = IIf(.UsedRange.Cells(.UsedRange.Cells.Count).Row >= defaultFirstRow, .UsedRange.Cells(.UsedRange.Cells.Count).Row, defaultFirstRow)
         lastColumn = IIf(.UsedRange(.UsedRange.Cells.Count).Column >= defaultFirstColumn, .UsedRange(.UsedRange.Cells.Count).Column, defaultFirstColumn)
         GetQueryAreaStringFromRange = "[" & .name & "$" & .Range(.Cells(firstRow, firstColumn), .Cells(lastRow, lastColumn)).Address(False, False) & "]"
     End With
@@ -129,8 +120,8 @@ End Function
 ' -----------------------------------------------------------
 ' Build a Query Area String
 ' -----------------------------------------------------------
-Public Function GetQueryAreaStringFromTable(sheet As Worksheet, Optional tableNameOrIndex As Variant = 1) As String
-    With sheet
+Public Function GetQueryAreaStringFromTable(Sheet As Worksheet, Optional tableNameOrIndex As Variant = 1) As String
+    With Sheet
         ' Calculate Vanilla Used Range
         GetQueryAreaStringFromTable = "[" & .name & "$" & .ListObjects(tableNameOrIndex).Range.Address(False, False) & "]"
     End With
@@ -325,16 +316,16 @@ Function TransferResultToRange(LeftTopCell As Range _
     , Optional ClearSheet As Boolean = False _
     )
     rs.MoveFirst
-    If ClearSheet Then LeftTopCell.Worksheet.UsedRange.clear
+    If ClearSheet Then LeftTopCell.Worksheet.UsedRange.Clear
     
     If Transpose Then  ' Transpose Query Result : Headers on Left Hand Side
         Dim result As Variant
         result = rs.GetRows
         If WithHeader Then
             For i = 0 To rs.Fields.Count - 1
-                LeftTopCell.Offset(i, 0) = rs.Fields(i).name
+                LeftTopCell.offset(i, 0) = rs.Fields(i).name
             Next i
-            Set LeftTopCell = LeftTopCell.Offset(0, 1)
+            Set LeftTopCell = LeftTopCell.offset(0, 1)
         End If  ' End of Creating Header
         ' Copy query result to LeftTopCell by resziing it to the shape of transposed result
         ' Please Note UBound and LBound Functions: UBound( ArrayName, [Dimension] ), [Dimension] : 1(rows), 2(columns)
@@ -343,10 +334,10 @@ Function TransferResultToRange(LeftTopCell As Range _
     Else  ' No transpose : Headers from Top
         If WithHeader Then
             For i = 0 To rs.Fields.Count - 1
-                LeftTopCell.Offset(0, i) = rs.Fields(i).name
+                LeftTopCell.offset(0, i) = rs.Fields(i).name
             Next i
             ' Copy query result to LeftTopCell
-           Set LeftTopCell = LeftTopCell.Offset(1, 0)
+           Set LeftTopCell = LeftTopCell.offset(1, 0)
         End If  ' End of Creating Header
         ' Copy query result to LeftTopCell
         rs.MoveFirst
@@ -368,13 +359,13 @@ Function TransferResultToTable(ByRef tbl As ListObject _
         ' Reset the Table
         If ResetTable Then
             ' Clear Everything
-            .Range.Offset(1, 0).clear
+            .Range.Resize(.Range.rows.Count - 1, .Range.columns.Count).offset(1, 0).Clear
             .HeaderRowRange.ClearContents
             If .HeaderRowRange.columns.Count > rs.Fields.Count Then
                 Dim extraCols As Range
-                Set extraCols = .HeaderRowRange.Resize(1, .HeaderRowRange.columns.Count - rs.Fields.Count).Offset(0, rs.Fields.Count)
+                Set extraCols = .HeaderRowRange.Resize(1, .HeaderRowRange.columns.Count - rs.Fields.Count).offset(0, rs.Fields.Count)
                 .Resize .Range.Resize(rs.RecordCount + 1, rs.Fields.Count)
-                extraCols.clear
+                extraCols.Clear
             Else
                 .Resize .Range.Resize(rs.RecordCount + 1, rs.Fields.Count)
             End If
@@ -389,8 +380,20 @@ Function TransferResultToTable(ByRef tbl As ListObject _
         End If
     
         ' Transfer the Result
-        if Not AddToBottom or 
-        .Range.Resize(1, 1).Offset(IIf(AddToBottom, .Range.rows.Count, 1), 0).CopyFromRecordset rs
+        Dim rowsOffset As Long
+        If AddToBottom Then
+            Dim isRowEmpty As Boolean
+            isRowEmpty = True
+            With .HeaderRowRange.offset(.Range.rows.Count - 1, 0)
+                For rowsOffset = 1 To .Cells.Count
+                    If Trim(.Resize(1, 1).offset(0, rowsOffset - 1)) <> "" Then isRowEmpty = False
+                Next rowsOffset
+            End With
+            rowsOffset = IIf(isRowEmpty, .Range.rows.Count - 1, .Range.rows.Count)
+        Else
+            rowsOffset = 1
+        End If
+         .Range.Resize(1, 1).offset(rowsOffset, 0).CopyFromRecordset rs
     End With
 End Function
 
