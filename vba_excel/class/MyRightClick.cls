@@ -62,18 +62,18 @@ End Function
 ' Clear Right Click Menu
 ' ******************************************************************************************
 Public Function ClearRightClickMenu(Optional ClearCell As Boolean = True, Optional ClearTbale As Boolean = True, Optional KeepMiniToolbar As Boolean = False)
-    Dim ctr As CommandBarControl
+    Dim CTR As CommandBarControl
      ' Clear Normal Range Right Click Menu Controls
     If ClearCell Then
-        For Each ctr In cbRng.Controls
-            ctr.Delete
-        Next ctr
+        For Each CTR In cbRng.Controls
+            CTR.Delete
+        Next CTR
     End If
      ' Clear Table Range Right Click Menu Controls
     If ClearTbale Then
-        For Each ctr In cbTbl.Controls
-            ctr.Delete
-        Next ctr
+        For Each CTR In cbTbl.Controls
+            CTR.Delete
+        Next CTR
     End If
     ' Show Floating Window
     If KeepMiniToolbar Then
@@ -87,19 +87,20 @@ End Function
 ' Build .OnAction String
 ' ******************************************************************************************
 Private Function BuildOnActionString(FuncName As String, Optional argArr = vbNullString)
+'    Debug.Assert FuncName <> "PlanActivitySPN"
     Dim idx As Long
     Dim result As String
-    result = "'" & CStr(FuncName) & " "
+    result = "'" & CStr(FuncName) & ""
 
     If IsArray(argArr) Then
         For idx = LBound(argArr) To UBound(argArr)
-            result = result & """" & CStr(argArr(idx)) & """"
+            result = result & " " & IIf(idx = LBound(argArr), vbNullString, ",") & IIf(VarType(argArr(idx)) = vbString, """", vbNullString) & argArr(idx) & IIf(VarType(argArr(idx)) = vbString, """", vbNullString)
         Next idx
     Else
-        If argArr <> vbNullString Then result = result & """" & CStr(argArr) & """"
+        If argArr <> vbNullString Then result = result & " " & """" & CStr(argArr) & """"
     End If
     
-    result = result & "'"
+    result = result & " " & "'"
     BuildOnActionString = result
 End Function
 
@@ -135,19 +136,25 @@ End Function
 ' ******************************************************************************************
 ' Add an item to right Click Menu : Level 1
 ' ******************************************************************************************
-Public Function AddItemLevel1(Caption As String, FuncName As String, Optional FuncParamArr = vbNullString, _
-    Optional ApplyToCell As Boolean = True, Optional ApplyToTable As Boolean = True, Optional BeginGroup As Boolean = False)
+Public Function AddItemLevel1(Caption As String, FuncName As String _
+    , Optional FuncParamArr = vbNullString _
+    , Optional ApplyToCell As Boolean = True _
+    , Optional ApplyToTable As Boolean = True _
+    , Optional BeginGroup As Boolean = False _
+    )
+    If Not (IsArray(FuncParamArr)) Then FuncParamArr = vbNullString
+    
      ' Get the Current first control and add a separator
     If ApplyToCell Then
         ' Add this Item
-        AddItem cbRng, Caption, FuncName, IIf(FuncParamArr = vbNullString, vbNullString, FuncParamArr)
+        AddItem cbRng, Caption, FuncName, FuncParamArr
         lv1MenuAdded = lv1MenuAdded + 1
     End If
     
      ' Get the Current first control and add a separator
     If ApplyToTable Then
         ' Add this Item
-        AddItem cbTbl, Caption, FuncName, IIf(FuncParamArr = vbNullString, vbNullString, FuncParamArr)
+        AddItem cbTbl, Caption, FuncName, FuncParamArr
         lv1MenuAdded = lv1MenuAdded + 1
     End If
     

@@ -1,3 +1,12 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "MyADO"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
 ' -----------------------------------------------------------
 ' Remember to reference the ADO library from your project
 ' -----------------------------------------------------------
@@ -169,8 +178,8 @@ Public Function BuildConnectionString_ThankQRep() As String
     thisConnectionString = _
             "Provider=sqloledb;" & _
             "Network Library=DBMSSOCN;" & _
-            "Data Source=192.168.0.23,1433;" & _
-            "Initial Catalog=thankQ4_Reporter2;" & _
+            "Data Source=192.168.0.27,1433;" & _
+            "Initial Catalog=thankQ4_Reporter;" & _
             "User Id=thankQ;" & _
             "Password=thankQ;"
     
@@ -315,12 +324,16 @@ Function TransferResultToRange(LeftTopCell As Range _
     , Optional Transpose As Boolean = False _
     , Optional ClearSheet As Boolean = False _
     )
-    rs.MoveFirst
     If ClearSheet Then LeftTopCell.Worksheet.UsedRange.Clear
     
     If Transpose Then  ' Transpose Query Result : Headers on Left Hand Side
         Dim result As Variant
+        ' GetRows returns a two-dimensional array.
+        ' The first subscript identifies the field and the second identifies the row number (intField, intRecord) : both zero-based.
+        ' Eg. result(0, 1) will be the data in the second row  & the first column
+        rs.MoveFirst
         result = rs.GetRows
+        
         If WithHeader Then
             For i = 0 To rs.Fields.Count - 1
                 LeftTopCell.offset(i, 0) = rs.Fields(i).name
@@ -470,3 +483,5 @@ Function ReplaceScriptParameter(ByVal srcText As String, parameter As String, ne
     ' Return Value
     ReplaceScriptParameter = srcText
 End Function
+
+

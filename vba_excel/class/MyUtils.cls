@@ -54,10 +54,10 @@ End Function
 ' Read a Value From a Name
 ' ############################################################################################
 Function GetNamedValue(name) As Variant
-    GetNamedValue = Excel.Evaluate(ThisWorkbook.Names(CStr(name)).value)
+    GetNamedValue = Excel.Evaluate(ThisWorkbook.Names(CStr(name)).Value)
 End Function
-Function SetNamedValue(name As String, value As Variant, Optional InQuote As Boolean = False)
-    ThisWorkbook.Names(CStr(name)).RefersTo = "=" & IIf(InQuote, """", vbNullString) & CStr(value) & IIf(InQuote, """", vbNullString)
+Function SetNamedValue(name As String, Value As Variant, Optional InQuote As Boolean = False)
+    ThisWorkbook.Names(CStr(name)).RefersTo = "=" & IIf(InQuote, """", vbNullString) & CStr(Value) & IIf(InQuote, """", vbNullString)
 End Function
 Function GetNamedRange(name) As Range
     Dim dest As String
@@ -68,6 +68,32 @@ End Function
 
 
 '############################################################################################
+' Warp a value with default Based on its value
+' ############################################################################################
+Function GetDefaultValueIfNull(Value As Variant, DefaultValue As Variant, Optional TrimValue As Boolean = True) As Variant
+    If IsNull(Value) Then Value = DefaultValue
+    If TrimValue Then Value = Trim(CStr(Value))
+    GetDefaultValueIfNull = Value
+End Function
+
+'############################################################################################
+' Check the last table line to see if it's avaliable
+' ############################################################################################
+Function IsTableLastRowEmpty(Table As ListObject) As Boolean
+    Dim isRowEmpty As Boolean
+    Dim i As Long
+    isRowEmpty = True
+    With Table
+        With .HeaderRowRange.offset(.Range.rows.Count - 1, 0)
+            For i = 1 To .Cells.Count
+                If Trim(.Resize(1, 1).offset(0, i - 1)) <> "" Then isRowEmpty = False
+            Next i
+        End With
+    End With
+    IsTableLastRowEmpty = isRowEmpty
+End Function
+
+'############################################################################################
 ' Refresh All Pivot Tables In a certain Sheet
 ' ############################################################################################
 Function RefeshAllPivotTable(wks As Worksheet)
@@ -75,6 +101,46 @@ Function RefeshAllPivotTable(wks As Worksheet)
     For Each pt In wks.PivotTables
         pt.RefreshTable
     Next pt
+End Function
+
+'############################################################################################
+' Transpose a 2D Array
+' ############################################################################################
+Function Transpose2DArray(Arr As Variant, Optional ForceBaseX As Integer = -1, Optional ForceBaseY As Integer = -1) As Variant
+    ' Why not  Application.WorksheetFunction.Transpose (This function can also be called using the shorthand Application.Transpose. )
+    ' The number of elements cannot exceed 5461 (13, Type Mismatch)
+    ' The array cannot contain any Null values (5, Invalid procedure call or argument)
+    ' The array cannot contain any items longer than 255 characters (1004, application defined or object defined error)
+    
+    Dim x As Long, y As Long, xLength As Long, yLength As Long, xLower As Long, yLower As Long, xUpper As Long, yUpper As Long
+    Dim tempArray As Variant
+    
+    xLower = LBound(Arr, 2)
+    yLower = LBound(Arr, 1)
+    xUpper = UBound(Arr, 2)
+    yUpper = UBound(Arr, 1)
+    
+    xLength = xUpper - xLower + 1
+    yLength = yUpper - yLower + 1
+    
+    If Not ForceBaseX = -1 Then
+        xLower = ForceBaseX
+        xUpper = ForceBaseX + xLength - 1
+    End If
+    
+    If Not ForceBaseY = -1 Then
+        yLower = ForceBaseY
+        yUpper = ForceBaseY + yLength - 1
+    End If
+    
+    ReDim tempArray(xLower To xUpper, yLower To yUpper)
+    For x = xLower To xUpper
+        For y = yLower To yUpper
+            tempArray(x, y) = Arr(y, x)
+        Next y
+    Next x
+    
+    TransposeArray = tempArray
 End Function
 
 
@@ -120,7 +186,7 @@ Function AddCommentsToRange(rng As Range, text As String _
                 .Visible = Visible
                 .shape.TextFrame.AutoSize = True
                 .shape.Top = IIf(Top, Top, cell.Top)
-                .shape.Left = IIf(Left, Left, cell.Offset(0, 1).Left - .shape.width)
+                .shape.Left = IIf(Left, Left, cell.offset(0, 1).Left - .shape.Width)
             End With
         End With
 EndLoop:
@@ -131,14 +197,14 @@ End Function
 ' Register OnAction Attribute to Button, Shape etc
 ' ############################################################################################
 Function BuildOnActionString(FuncName As String, Optional argArr = vbNullChar)
-    Dim X As Long
+    Dim x As Long
     Dim result As String
     result = "'" & CStr(FuncName) & " "
 
     If IsArray(argArr) Then
-        For X = LBound(argArr) To UBound(argArr)
-            result = result & """" & CStr(argArr(X)) & """"
-        Next X
+        For x = LBound(argArr) To UBound(argArr)
+            result = result & """" & CStr(argArr(x)) & """"
+        Next x
     Else
         If argArr <> vbNullChar Then result = result & """" & CStr(argArr) & """"
     End If
@@ -150,25 +216,25 @@ End Function
 '############################################################################################
 ' Sort : Bubble
 ' ############################################################################################
-Function SortInPlace_Bubble(ByRef arr, Optional sortAsc As Boolean = True)
+Function SortInPlace_Bubble(ByRef Arr, Optional sortAsc As Boolean = True)
     Dim tempVal As Variant
     Dim i, j As Long
     ' Bubble Sort x Range
-    For i = LBound(arr) To UBound(arr) - 1
-        For j = i + 1 To UBound(arr)
+    For i = LBound(Arr) To UBound(Arr) - 1
+        For j = i + 1 To UBound(Arr)
             ' Bubble Biggest to top
             If Not sortAsc Then
-                If arr(i) < arr(j) Then
-                    tempVal = arr(i)
-                    arr(i) = arr(j)
-                    arr(j) = tempVal
+                If Arr(i) < Arr(j) Then
+                    tempVal = Arr(i)
+                    Arr(i) = Arr(j)
+                    Arr(j) = tempVal
                 End If
             ' Bubble Smallest to top
             Else
-                If arr(i) > arr(j) Then
-                    tempVal = arr(i)
-                    arr(i) = arr(j)
-                    arr(j) = tempVal
+                If Arr(i) > Arr(j) Then
+                    tempVal = Arr(i)
+                    Arr(i) = Arr(j)
+                    Arr(j) = tempVal
                 End If
             End If
         Next j
@@ -265,7 +331,7 @@ On Error GoTo errHandler
 
     wks.PageSetup.PrintArea = outputRange.Address
 
-    ActiveWindow.SelectedSheets.PrintOut from:=1, to:=1, Copies:=1, Collate _
+    ActiveWindow.SelectedSheets.PrintOut From:=1, To:=1, Copies:=1, Collate _
     :=True
 
     MsgBox "Your Printint Command has been sent to the printer", vbOKOnly, "( / �__�)/ "
@@ -293,21 +359,21 @@ Public Function GetUsedRangeIncShapeChart(Target As Worksheet, _
 
     With Target
         ' Calculate Vanilla Used Range
-        firstRow = .UsedRange.Cells(1).row
+        firstRow = .UsedRange.Cells(1).Row
         firstColumn = .UsedRange.Cells(1).Column
-        lastRow = .UsedRange.Cells(.UsedRange.Cells.Count).row
+        lastRow = .UsedRange.Cells(.UsedRange.Cells.Count).Row
         lastColumn = .UsedRange(.UsedRange.Cells.Count).Column
         
         ' Calculate Chart Used Range
         If Not ignoreChart Then
             For Each Chart In .ChartObjects
                 With Chart
-                    If .TopLeftCell.row < firstRow Then _
-                        firstRow = .TopLeftCell.row
+                    If .TopLeftCell.Row < firstRow Then _
+                        firstRow = .TopLeftCell.Row
                     If .TopLeftCell.Column < firstColumn Then _
                         firstColumn = .TopLeftCell.Column
-                    If .BottomRightCell.row > lastRow Then _
-                        lastRow = .BottomRightCell.row
+                    If .BottomRightCell.Row > lastRow Then _
+                        lastRow = .BottomRightCell.Row
                     If .BottomRightCell.Column > lastColumn Then _
                         lastColumn = .BottomRightCell.Column
                 End With
@@ -318,12 +384,12 @@ Public Function GetUsedRangeIncShapeChart(Target As Worksheet, _
         If Not ignoreShape Then
              For Each shape In .Shapes
                 With shape
-                    If .TopLeftCell.row < firstRow Then _
-                        firstRow = .TopLeftCell.row
+                    If .TopLeftCell.Row < firstRow Then _
+                        firstRow = .TopLeftCell.Row
                     If .TopLeftCell.Column < firstColumn Then _
                         firstColumn = .TopLeftCell.Column
-                    If .BottomRightCell.row > lastRow Then _
-                        lastRow = .BottomRightCell.row
+                    If .BottomRightCell.Row > lastRow Then _
+                        lastRow = .BottomRightCell.Row
                     If .BottomRightCell.Column > lastColumn Then _
                         lastColumn = .BottomRightCell.Column
                 End With
@@ -399,7 +465,7 @@ With fd
     End If
 
     ' Clear out the current filters, and add our own.
-    .Filters.clear
+    .Filters.Clear
     .Filters.Add "Excel", "*.xls; *.xlsx; *.xlsm; *.xlsb; *.csv"
     .Filters.Add "All Files", "*.*"
 
@@ -484,25 +550,25 @@ Function ImportOneSheet(srcPath, srcWksIdx, destWks As Worksheet _
         ' Process the table
         With destWks.ListObjects(toTableIdx)
             ' Remove the Content
-            .Range.Offset(1, 0).ClearContents
+            .Range.offset(1, 0).ClearContents
             ' Shrink the Table
             If withTitle Then
                 .Resize .Range.Resize(3, .HeaderRowRange.columns.Count)
                 ' Define Destination
-                Set destRng = .HeaderRowRange.Resize(1, 1).Offset(0, 0)
+                Set destRng = .HeaderRowRange.Resize(1, 1).offset(0, 0)
             Else
                 Dim beforeHeaderRng As Range
-                Set beforeHeaderRng = .HeaderRowRange.Offset(0, 1)
+                Set beforeHeaderRng = .HeaderRowRange.offset(0, 1)
                 .Resize .Range.Resize(3, 1)
-                beforeHeaderRng.clear
+                beforeHeaderRng.Clear
                 ' Define Destination
-                Set destRng = .HeaderRowRange.Resize(1, 1).Offset(1, 0)
+                Set destRng = .HeaderRowRange.Resize(1, 1).offset(1, 0)
             End If
         End With
     Else
         With destWks.UsedRange
             ' Remove the Content
-            .clear
+            .Clear
             ' Define Destination
             Set destRng = destWks.Range("A1")
         End With
@@ -539,7 +605,7 @@ Function CollectionKeyExists(collection As collection, strKey As String) As Bool
     On Error Resume Next
     var = collection(strKey)
     CollectionKeyExists = (Err.Number = 0)
-    Err.clear
+    Err.Clear
 End Function
 
 
