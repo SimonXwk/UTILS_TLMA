@@ -25,10 +25,10 @@ End Sub
 ' ############################################################################################
 Function SilentMode(isOn As Boolean)
     With Application
-        .ScreenUpdating = Not (isOn)
         .Calculation = IIf(isOn, xlCalculationManual, xlCalculationAutomatic)
 '        .DisplayStatusBar = Not (isOn)
 '        .EnableEvents = Not (isOn)
+        .ScreenUpdating = Not (isOn)  ' ScreenUpdating to be the last to avoid flicking
     End With
     
 '    With ActiveSheet
@@ -94,6 +94,16 @@ Function IsTableLastRowEmpty(Table As ListObject) As Boolean
 End Function
 
 '############################################################################################
+' Clear Table Content
+' ############################################################################################
+Function ClearTableContent(Table As ListObject, Optional DefaultRows As Long = 3)
+    With Table
+        .Range.Resize(.Range.rows.Count - 1, .HeaderRowRange.columns.Count).offset(1, 0).ClearContents
+        .Resize .Range.Resize(DefaultRows, .HeaderRowRange.columns.Count)
+    End With
+End Function
+
+'############################################################################################
 ' Refresh All Pivot Tables In a certain Sheet
 ' ############################################################################################
 Function RefeshAllPivotTable(wks As Worksheet)
@@ -140,7 +150,23 @@ Function Transpose2DArray(Arr As Variant, Optional ForceBaseX As Integer = -1, O
         Next y
     Next x
     
-    TransposeArray = tempArray
+    Transpose2DArray = tempArray
+End Function
+
+'############################################################################################
+' function that tests if a worksheet exists in the Thisworkbook ( or may be ActiveWorkbook ?)
+' ############################################################################################
+Function IsExistingWorksheet(ByVal SheetName As String) As Boolean
+    Dim wks As Worksheet
+    Dim exist As Boolean
+    exist = False
+    For Each wks In ThisWorkbook.Worksheets
+        If wks.name = SheetName Then
+            exist = True
+            Exit For
+        End If
+    Next wks
+    IsExistingWorksheet = exist
 End Function
 
 
@@ -331,7 +357,7 @@ On Error GoTo errHandler
 
     wks.PageSetup.PrintArea = outputRange.Address
 
-    ActiveWindow.SelectedSheets.PrintOut From:=1, To:=1, Copies:=1, Collate _
+    ActiveWindow.SelectedSheets.PrintOut FROM:=1, To:=1, Copies:=1, Collate _
     :=True
 
     MsgBox "Your Printint Command has been sent to the printer", vbOKOnly, "( / �__�)/ "
@@ -360,9 +386,9 @@ Public Function GetUsedRangeIncShapeChart(Target As Worksheet, _
     With Target
         ' Calculate Vanilla Used Range
         firstRow = .UsedRange.Cells(1).Row
-        firstColumn = .UsedRange.Cells(1).Column
+        firstColumn = .UsedRange.Cells(1).column
         lastRow = .UsedRange.Cells(.UsedRange.Cells.Count).Row
-        lastColumn = .UsedRange(.UsedRange.Cells.Count).Column
+        lastColumn = .UsedRange(.UsedRange.Cells.Count).column
         
         ' Calculate Chart Used Range
         If Not ignoreChart Then
@@ -370,12 +396,12 @@ Public Function GetUsedRangeIncShapeChart(Target As Worksheet, _
                 With Chart
                     If .TopLeftCell.Row < firstRow Then _
                         firstRow = .TopLeftCell.Row
-                    If .TopLeftCell.Column < firstColumn Then _
-                        firstColumn = .TopLeftCell.Column
+                    If .TopLeftCell.column < firstColumn Then _
+                        firstColumn = .TopLeftCell.column
                     If .BottomRightCell.Row > lastRow Then _
                         lastRow = .BottomRightCell.Row
-                    If .BottomRightCell.Column > lastColumn Then _
-                        lastColumn = .BottomRightCell.Column
+                    If .BottomRightCell.column > lastColumn Then _
+                        lastColumn = .BottomRightCell.column
                 End With
             Next Chart
         End If
@@ -386,12 +412,12 @@ Public Function GetUsedRangeIncShapeChart(Target As Worksheet, _
                 With shape
                     If .TopLeftCell.Row < firstRow Then _
                         firstRow = .TopLeftCell.Row
-                    If .TopLeftCell.Column < firstColumn Then _
-                        firstColumn = .TopLeftCell.Column
+                    If .TopLeftCell.column < firstColumn Then _
+                        firstColumn = .TopLeftCell.column
                     If .BottomRightCell.Row > lastRow Then _
                         lastRow = .BottomRightCell.Row
-                    If .BottomRightCell.Column > lastColumn Then _
-                        lastColumn = .BottomRightCell.Column
+                    If .BottomRightCell.column > lastColumn Then _
+                        lastColumn = .BottomRightCell.column
                 End With
             Next shape
         End If

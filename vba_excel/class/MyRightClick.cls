@@ -142,7 +142,6 @@ Public Function AddItemLevel1(Caption As String, FuncName As String _
     , Optional ApplyToTable As Boolean = True _
     , Optional BeginGroup As Boolean = False _
     )
-    If Not (IsArray(FuncParamArr)) Then FuncParamArr = vbNullString
     
      ' Get the Current first control and add a separator
     If ApplyToCell Then

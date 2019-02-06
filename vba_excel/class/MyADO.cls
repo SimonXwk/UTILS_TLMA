@@ -71,8 +71,8 @@ End Function
 ' -----------------------------------------------------------
 ' Open Connection
 ' -----------------------------------------------------------
- Public Function Connect(connString As String)
-    If connString = "" Then Exit Function
+ Public Sub Connect(connString As String)
+    If connString = "" Then Exit Sub
     ' Close Current Connection
     TearDownConnection
     ' Setup a new connection
@@ -87,13 +87,13 @@ End Function
         .ConnectionString = connString
         .Open
     End With
-End Function
+End Sub
 
 ' -----------------------------------------------------------
 ' Execute a SQL script
 ' -----------------------------------------------------------
-Sub Query(sqlScript As String)
-    If cnn Is Nothing Then Exit Sub
+Public Function Query(sqlScript As String) As Long
+    If cnn Is Nothing Then Exit Function
     TearDownRecordset
     Set rs = New ADODB.Recordset
     ' Or use CreateObject method: Objects instantiated with CreateObject are late-bound,
@@ -108,31 +108,43 @@ Sub Query(sqlScript As String)
         .LockType = adLockOptimistic
         .Open sqlScript
         ' .Open sqlScript, cnn, adOpenKeyset, adLockOptimistic
+        On Error GoTo NoResult
+        Query = CLng(rs.RecordCount)
+        Exit Function
+NoResult:
+        Query = 0
     End With
-End Sub
+End Function
+
 
 ' -----------------------------------------------------------
 ' Build a Query Area String
 ' -----------------------------------------------------------
-Public Function GetQueryAreaStringFromRange(Sheet As Worksheet, Optional defaultFirstRow As Long = 1, Optional defaultFirstColumn As Long = 1) As String
+Public Function GetQueryAreaStringFromRange(Sheet As Worksheet, Optional defaultFirstRow As Long = 1 _
+    , Optional defaultFirstColumn As Long = 1 _
+    , Optional Alias As String = vbNullString _
+    ) As String
     Dim firstRow, firstColumn, lastRow, lastColumn As Long
     With Sheet
         ' Calculate Vanilla Used Range
         firstRow = IIf(.UsedRange.Cells(1).Row >= defaultFirstRow, .UsedRange.Cells(1).Row, defaultFirstRow)
-        firstColumn = IIf(.UsedRange.Cells(1).Column >= defaultFirstColumn, .UsedRange.Cells(1).Column, defaultFirstColumn)
+        firstColumn = IIf(.UsedRange.Cells(1).column >= defaultFirstColumn, .UsedRange.Cells(1).column, defaultFirstColumn)
         lastRow = IIf(.UsedRange.Cells(.UsedRange.Cells.Count).Row >= defaultFirstRow, .UsedRange.Cells(.UsedRange.Cells.Count).Row, defaultFirstRow)
-        lastColumn = IIf(.UsedRange(.UsedRange.Cells.Count).Column >= defaultFirstColumn, .UsedRange(.UsedRange.Cells.Count).Column, defaultFirstColumn)
-        GetQueryAreaStringFromRange = "[" & .name & "$" & .Range(.Cells(firstRow, firstColumn), .Cells(lastRow, lastColumn)).Address(False, False) & "]"
+        lastColumn = IIf(.UsedRange(.UsedRange.Cells.Count).column >= defaultFirstColumn, .UsedRange(.UsedRange.Cells.Count).column, defaultFirstColumn)
+        GetQueryAreaStringFromRange = "[" & .name & "$" & .Range(.Cells(firstRow, firstColumn), .Cells(lastRow, lastColumn)).Address(False, False) & "]" & IIf(Trim(Alias) = "", vbNullString, " " & Trim(Alias))
     End With
 End Function
 
 ' -----------------------------------------------------------
 ' Build a Query Area String
 ' -----------------------------------------------------------
-Public Function GetQueryAreaStringFromTable(Sheet As Worksheet, Optional tableNameOrIndex As Variant = 1) As String
+Public Function GetQueryAreaStringFromTable(Sheet As Worksheet _
+    , Optional tableNameOrIndex As Variant = 1 _
+    , Optional Alias As String = vbNullString _
+    ) As String
     With Sheet
         ' Calculate Vanilla Used Range
-        GetQueryAreaStringFromTable = "[" & .name & "$" & .ListObjects(tableNameOrIndex).Range.Address(False, False) & "]"
+        GetQueryAreaStringFromTable = "[" & .name & "$" & .ListObjects(tableNameOrIndex).Range.Address(False, False) & "]" & IIf(Trim(Alias) = "", vbNullString, " " & Trim(Alias))
     End With
 End Function
 
@@ -140,12 +152,16 @@ End Function
 ' Build a Connection String to ThankQ (currenv version 4)
 ' -----------------------------------------------------------
 Public Function BuildConnectionString_ThankQ() As String
+    Dim server As String, database As String
+    server = "192.168.0.23,1433"
+    database = "thankQ4_Reporter"
+    
     ' OLE DB Provider for ODBC Databases
 '    thisConnectionString = _
 '            "Provider=MSDASQL;" & _
 '            "Driver={SQL Server};" & _
-'            "Server=192.168.0.23,1433;" & _
-'            "Database=thankQ4_Reporter;" & _
+'            "Server=" & server & ";" & _
+'            "Database=" & database & ";" & _
 '            "Uid=thankQ;" & _
 '            "Pwd=thankQ;"
 
@@ -153,8 +169,8 @@ Public Function BuildConnectionString_ThankQ() As String
     thisConnectionString = _
             "Provider=sqloledb;" & _
             "Network Library=DBMSSOCN;" & _
-            "Data Source=192.168.0.31,1433;" & _
-            "Initial Catalog=thankQ4_Reporter;" & _
+            "Data Source=" & server & ";" & _
+            "Initial Catalog=" & database & ";" & _
             "User Id=thankQ;" & _
             "Password=thankQ;"
 
@@ -165,12 +181,16 @@ End Function
 ' Build a Connection String to ThankQ (currenv version 4)
 ' -----------------------------------------------------------
 Public Function BuildConnectionString_ThankQRep() As String
+    Dim server As String, database As String
+    server = "192.168.0.27,1433"
+    database = "thankQ4_Reporter"
+    
     ' OLE DB Provider for ODBC Databases
 '     thisConnectionString = _
 '            "Provider=MSDASQL;" & _
 '            "Driver={SQL Server};" & _
-'            "Server=192.168.0.27,1433;" & _
-'            "Database=thankQ4_Reporter2;" & _
+'            "Server=" & server & ";" & _
+'            "Database=" & database & ";" & _
 '            "Uid=thankQ;" & _
 '            "Pwd=thankQ;"
 
@@ -178,8 +198,8 @@ Public Function BuildConnectionString_ThankQRep() As String
     thisConnectionString = _
             "Provider=sqloledb;" & _
             "Network Library=DBMSSOCN;" & _
-            "Data Source=192.168.0.27,1433;" & _
-            "Initial Catalog=thankQ4_Reporter;" & _
+            "Data Source=" & server & ";" & _
+            "Initial Catalog=" & database & ";" & _
             "User Id=thankQ;" & _
             "Password=thankQ;"
     
@@ -190,18 +210,21 @@ End Function
 ' Build a Connection String to This Workbook
 ' -----------------------------------------------------------
  Public Function BuildConnectionString_WorkbookThis() As String
-
+    strDataSource = ThisWorkbook.Path & Application.PathSeparator & ThisWorkbook.name
+    
 '    strProvider = "Microsoft.ACE.OLEDB.12.0"
 '    strDataSource = ThisWorkbook.path & Application.PathSeparator & ThisWorkbook.name
 '    strExtendedProperties = """" & "Excel 8.0" & ";HDR=Yes" & """"     ' Excel 12.0 Xml
-'
+
+    ' In this case the Excel 8.0 refers not to your version of Excel but to the ADO provider used to access Excel.
+    ' HDR=Yes simply indicates that the spreadsheet has a header row
+    
 '    thisConnectionString = _
 '            "Provider=" & strProvider & ";" _
 '            & "Data Source=" & strDataSource & ";" _
 '            & "Extended Properties=" & strExtendedProperties & ";"
     
     ' ODBC Driver for Excel
-    strDataSource = ThisWorkbook.Path & Application.PathSeparator & ThisWorkbook.name
     thisConnectionString = _
            "Driver={Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)}" & ";" _
            & "Dbq=" & strDataSource & ";" _
@@ -214,7 +237,8 @@ End Function
 ' Build a Connection String to Active Workbook
 ' -----------------------------------------------------------
 Public Function BuildConnectionString_WorkbookActive() As String
-
+    strDataSource = ActiveWorkbook.Path & Application.PathSeparator & ActiveWorkbook.name
+    
 '    strProvider = "Microsoft.ACE.OLEDB.12.0"
 '    strDataSource = ActiveWorkbook.path & Application.PathSeparator & ActiveWorkbook.name
 '    strExtendedProperties = """" & "Excel 8.0" & ";HDR=Yes" & """"     ' Excel 12.0 Xml
@@ -225,7 +249,6 @@ Public Function BuildConnectionString_WorkbookActive() As String
 '            & "Extended Properties=" & strExtendedProperties & ";"
 
     ' ODBC Driver for Excel
-    strDataSource = ActiveWorkbook.Path & Application.PathSeparator & ActiveWorkbook.name
     thisConnectionString = _
            "Driver={Microsoft Excel Driver (*.xls, *.xlsx, *.xlsm, *.xlsb)}" & ";" _
            & "Dbq=" & strDataSource & ";" _
@@ -238,13 +261,13 @@ End Function
 ' Build a Connection String to Given Workbook
 ' -----------------------------------------------------------
 Public Function BuildConnectionString_WorkbookExternal(ExternalExcelFullPath As String) As String
+    If Trim(ExternalExcelFullPath) = "" Then Exit Function
     ' OLE DB Provider
 '    thisConnectionString = _
 '    "Provider=Microsoft.ACE.OLEDB.12.0;" & _
-'            "Data Source=" & "'" & fullPath & "'" & ";" & _
+'            "Data Source=" & "'" & ExternalExcelFullPath & "'" & ";" & _
 '            "Extended Properties=""Excel 12.0 Xml;HDR=YES;"";"
 
-    If Trim(ExternalExcelFullPath) = "" Then Exit Function
 
     ' ODBC Driver for Excel
     thisConnectionString = _
@@ -286,9 +309,9 @@ End Function
  Function GetConnectionState(state As Integer) As String
     Select Case CInt(state)
         Case adStateClosed
-            GetConnectionState = "adStateClosed"
+            GetConnectionState = "Closed"
         Case adStateOpen
-            GetConnectionState = "adStateOpen"
+            GetConnectionState = "Open"
         Case Else
             GetConnectionState = "Unknown"
     End Select
@@ -319,7 +342,7 @@ End Function
 ' -----------------------------------------------------------
 ' Copy Record Set to Range
 ' -----------------------------------------------------------
-Function TransferResultToRange(LeftTopCell As Range _
+Sub TransferResultToRange(LeftTopCell As Range _
     , Optional WithHeader As Boolean = False _
     , Optional Transpose As Boolean = False _
     , Optional ClearSheet As Boolean = False _
@@ -356,13 +379,13 @@ Function TransferResultToRange(LeftTopCell As Range _
         rs.MoveFirst
         LeftTopCell.CopyFromRecordset rs
     End If
-End Function
+End Sub
 
 
 ' -----------------------------------------------------------
 ' Copy Record Set to Table
 ' -----------------------------------------------------------
-Function TransferResultToTable(ByRef tbl As ListObject _
+Sub TransferResultToTable(ByRef tbl As ListObject _
     , Optional ResetTable As Boolean = True _
     , Optional UpdateHeader As Boolean = True _
     , Optional AddToBottom As Boolean = False _
@@ -408,7 +431,7 @@ Function TransferResultToTable(ByRef tbl As ListObject _
         End If
          .Range.Resize(1, 1).offset(rowsOffset, 0).CopyFromRecordset rs
     End With
-End Function
+End Sub
 
 ' -----------------------------------------------------------
 ' Replace a certain part of the sql script with new value
@@ -443,7 +466,7 @@ Function ReplaceScriptParameter(ByVal srcText As String, parameter As String, ne
     ' Pointers
     Dim start_pointer, end_pointer As Long
     
-    ' Reset the start pointer to Zero ( ! important, not 1 )
+    ' Reset the start pointer to Zero ( ! important, not 1 , for Do-While Loop Purpose)
     start_pointer = 0
     Do
         start_pointer = InStr(start_pointer + 1, srcText, startParameter)
