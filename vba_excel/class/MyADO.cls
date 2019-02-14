@@ -120,16 +120,17 @@ End Function
 ' -----------------------------------------------------------
 ' Build a Query Area String
 ' -----------------------------------------------------------
-Public Function GetQueryAreaStringFromRange(Sheet As Worksheet, Optional defaultFirstRow As Long = 1 _
+Public Function GetQueryAreaStringFromRange(Sheet As Worksheet _
+    , Optional defaultFirstRow As Long = 1 _
     , Optional defaultFirstColumn As Long = 1 _
     , Optional Alias As String = vbNullString _
     ) As String
     Dim firstRow, firstColumn, lastRow, lastColumn As Long
     With Sheet
         ' Calculate Vanilla Used Range
-        firstRow = IIf(.UsedRange.Cells(1).Row >= defaultFirstRow, .UsedRange.Cells(1).Row, defaultFirstRow)
+        firstRow = IIf(.UsedRange.Cells(1).row >= defaultFirstRow, .UsedRange.Cells(1).row, defaultFirstRow)
         firstColumn = IIf(.UsedRange.Cells(1).column >= defaultFirstColumn, .UsedRange.Cells(1).column, defaultFirstColumn)
-        lastRow = IIf(.UsedRange.Cells(.UsedRange.Cells.Count).Row >= defaultFirstRow, .UsedRange.Cells(.UsedRange.Cells.Count).Row, defaultFirstRow)
+        lastRow = IIf(.UsedRange.Cells(.UsedRange.Cells.Count).row >= defaultFirstRow, .UsedRange.Cells(.UsedRange.Cells.Count).row, defaultFirstRow)
         lastColumn = IIf(.UsedRange(.UsedRange.Cells.Count).column >= defaultFirstColumn, .UsedRange(.UsedRange.Cells.Count).column, defaultFirstColumn)
         GetQueryAreaStringFromRange = "[" & .name & "$" & .Range(.Cells(firstRow, firstColumn), .Cells(lastRow, lastColumn)).Address(False, False) & "]" & IIf(Trim(Alias) = "", vbNullString, " " & Trim(Alias))
     End With
@@ -139,12 +140,16 @@ End Function
 ' Build a Query Area String
 ' -----------------------------------------------------------
 Public Function GetQueryAreaStringFromTable(Sheet As Worksheet _
-    , Optional tableNameOrIndex As Variant = 1 _
+    , Optional TableNameOrIndex As Variant = 1 _
     , Optional Alias As String = vbNullString _
     ) As String
-    With Sheet
+    With Sheet.ListObjects(TableNameOrIndex)
         ' Calculate Vanilla Used Range
-        GetQueryAreaStringFromTable = "[" & .name & "$" & .ListObjects(tableNameOrIndex).Range.Address(False, False) & "]" & IIf(Trim(Alias) = "", vbNullString, " " & Trim(Alias))
+        If .TotalsRowRange Is Nothing Then
+            GetQueryAreaStringFromTable = "[" & Sheet.name & "$" & .Range.Address(False, False) & "]" & IIf(Trim(Alias) = "", vbNullString, " " & Trim(Alias))
+        Else
+             GetQueryAreaStringFromTable = "[" & Sheet.name & "$" & .Range.Resize(.Range.rows.Count - 1, .Range.Columns.Count).Address(False, False) & "]" & IIf(Trim(Alias) = "", vbNullString, " " & Trim(Alias))
+        End If
     End With
 End Function
 
@@ -395,11 +400,11 @@ Sub TransferResultToTable(ByRef tbl As ListObject _
         ' Reset the Table
         If ResetTable Then
             ' Clear Everything
-            .Range.Resize(.Range.rows.Count - 1, .Range.columns.Count).offset(1, 0).Clear
+            .Range.Resize(.Range.rows.Count - 1, .Range.Columns.Count).offset(1, 0).Clear
             .HeaderRowRange.ClearContents
-            If .HeaderRowRange.columns.Count > rs.Fields.Count Then
+            If .HeaderRowRange.Columns.Count > rs.Fields.Count Then
                 Dim extraCols As Range
-                Set extraCols = .HeaderRowRange.Resize(1, .HeaderRowRange.columns.Count - rs.Fields.Count).offset(0, rs.Fields.Count)
+                Set extraCols = .HeaderRowRange.Resize(1, .HeaderRowRange.Columns.Count - rs.Fields.Count).offset(0, rs.Fields.Count)
                 .Resize .Range.Resize(rs.RecordCount + 1, rs.Fields.Count)
                 extraCols.Clear
             Else

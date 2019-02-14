@@ -73,6 +73,7 @@ End Function
 Function GetDefaultValueIfNull(Value As Variant, DefaultValue As Variant, Optional TrimValue As Boolean = True) As Variant
     If IsNull(Value) Then Value = DefaultValue
     If TrimValue Then Value = Trim(CStr(Value))
+    If Value = "" Then Value = DefaultValue
     GetDefaultValueIfNull = Value
 End Function
 
@@ -84,9 +85,9 @@ Function IsTableLastRowEmpty(Table As ListObject) As Boolean
     Dim i As Long
     isRowEmpty = True
     With Table
-        With .HeaderRowRange.offset(.Range.rows.Count - 1, 0)
+        With .HeaderRowRange.Offset(.Range.rows.Count - 1, 0)
             For i = 1 To .Cells.Count
-                If Trim(.Resize(1, 1).offset(0, i - 1)) <> "" Then isRowEmpty = False
+                If Trim(.Resize(1, 1).Offset(0, i - 1)) <> "" Then isRowEmpty = False
             Next i
         End With
     End With
@@ -98,8 +99,8 @@ End Function
 ' ############################################################################################
 Function ClearTableContent(Table As ListObject, Optional DefaultRows As Long = 3)
     With Table
-        .Range.Resize(.Range.rows.Count - 1, .HeaderRowRange.columns.Count).offset(1, 0).ClearContents
-        .Resize .Range.Resize(DefaultRows, .HeaderRowRange.columns.Count)
+        .Range.Resize(.Range.rows.Count - 1, .HeaderRowRange.Columns.Count).Offset(1, 0).ClearContents
+        .Resize .Range.Resize(DefaultRows, .HeaderRowRange.Columns.Count)
     End With
 End Function
 
@@ -212,7 +213,7 @@ Function AddCommentsToRange(rng As Range, text As String _
                 .Visible = Visible
                 .shape.TextFrame.AutoSize = True
                 .shape.Top = IIf(Top, Top, cell.Top)
-                .shape.Left = IIf(Left, Left, cell.offset(0, 1).Left - .shape.Width)
+                .shape.Left = IIf(Left, Left, cell.Offset(0, 1).Left - .shape.Width)
             End With
         End With
 EndLoop:
@@ -385,21 +386,21 @@ Public Function GetUsedRangeIncShapeChart(Target As Worksheet, _
 
     With Target
         ' Calculate Vanilla Used Range
-        firstRow = .UsedRange.Cells(1).Row
+        firstRow = .UsedRange.Cells(1).row
         firstColumn = .UsedRange.Cells(1).column
-        lastRow = .UsedRange.Cells(.UsedRange.Cells.Count).Row
+        lastRow = .UsedRange.Cells(.UsedRange.Cells.Count).row
         lastColumn = .UsedRange(.UsedRange.Cells.Count).column
         
         ' Calculate Chart Used Range
         If Not ignoreChart Then
             For Each Chart In .ChartObjects
                 With Chart
-                    If .TopLeftCell.Row < firstRow Then _
-                        firstRow = .TopLeftCell.Row
+                    If .TopLeftCell.row < firstRow Then _
+                        firstRow = .TopLeftCell.row
                     If .TopLeftCell.column < firstColumn Then _
                         firstColumn = .TopLeftCell.column
-                    If .BottomRightCell.Row > lastRow Then _
-                        lastRow = .BottomRightCell.Row
+                    If .BottomRightCell.row > lastRow Then _
+                        lastRow = .BottomRightCell.row
                     If .BottomRightCell.column > lastColumn Then _
                         lastColumn = .BottomRightCell.column
                 End With
@@ -410,12 +411,12 @@ Public Function GetUsedRangeIncShapeChart(Target As Worksheet, _
         If Not ignoreShape Then
              For Each shape In .Shapes
                 With shape
-                    If .TopLeftCell.Row < firstRow Then _
-                        firstRow = .TopLeftCell.Row
+                    If .TopLeftCell.row < firstRow Then _
+                        firstRow = .TopLeftCell.row
                     If .TopLeftCell.column < firstColumn Then _
                         firstColumn = .TopLeftCell.column
-                    If .BottomRightCell.Row > lastRow Then _
-                        lastRow = .BottomRightCell.Row
+                    If .BottomRightCell.row > lastRow Then _
+                        lastRow = .BottomRightCell.row
                     If .BottomRightCell.column > lastColumn Then _
                         lastColumn = .BottomRightCell.column
                 End With
@@ -576,19 +577,19 @@ Function ImportOneSheet(srcPath, srcWksIdx, destWks As Worksheet _
         ' Process the table
         With destWks.ListObjects(toTableIdx)
             ' Remove the Content
-            .Range.offset(1, 0).ClearContents
+            .Range.Offset(1, 0).ClearContents
             ' Shrink the Table
             If withTitle Then
-                .Resize .Range.Resize(3, .HeaderRowRange.columns.Count)
+                .Resize .Range.Resize(3, .HeaderRowRange.Columns.Count)
                 ' Define Destination
-                Set destRng = .HeaderRowRange.Resize(1, 1).offset(0, 0)
+                Set destRng = .HeaderRowRange.Resize(1, 1).Offset(0, 0)
             Else
                 Dim beforeHeaderRng As Range
-                Set beforeHeaderRng = .HeaderRowRange.offset(0, 1)
+                Set beforeHeaderRng = .HeaderRowRange.Offset(0, 1)
                 .Resize .Range.Resize(3, 1)
                 beforeHeaderRng.Clear
                 ' Define Destination
-                Set destRng = .HeaderRowRange.Resize(1, 1).offset(1, 0)
+                Set destRng = .HeaderRowRange.Resize(1, 1).Offset(1, 0)
             End If
         End With
     Else
