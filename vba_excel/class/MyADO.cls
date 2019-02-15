@@ -14,7 +14,7 @@ Private cnn As ADODB.Connection
 Private rs As ADODB.Recordset
 Private thisConnectionString As String
 Private strProvider, strDataSrc, strExtendedProperties As String
-
+Private sSQLScript As String
 ' -----------------------------------------------------------
 ' Initializing
 ' -----------------------------------------------------------
@@ -39,6 +39,10 @@ Public Property Get Connection() As ADODB.Connection
     Set Connection = cnn
 End Property
 
+Public Property Get SQLScript() As String
+    SQLScript = sSQLScript
+End Property
+
 ' -----------------------------------------------------------
 ' Destory Everything
 ' -----------------------------------------------------------
@@ -46,6 +50,7 @@ End Property
     TearDownRecordset
     TearDownConnection
     thisConnectionString = vbNullString
+    sSQLScript = vbNullString
 End Function
 
 ' -----------------------------------------------------------
@@ -71,8 +76,8 @@ End Function
 ' -----------------------------------------------------------
 ' Open Connection
 ' -----------------------------------------------------------
- Public Sub Connect(connString As String)
-    If connString = "" Then Exit Sub
+ Public Sub Connect(ConnString As String, Optional Timeout As Long = 15)
+    If ConnString = "" Then Exit Sub
     ' Close Current Connection
     TearDownConnection
     ' Setup a new connection
@@ -84,36 +89,72 @@ End Function
     ' Set cnn = CreateObject("ADODB.Connection")
     ' Open Connection using given connection string
     With cnn
-        .ConnectionString = connString
+        .ConnectionString = ConnString
+        .ConnectionTimeout = Timeout
         .Open
     End With
 End Sub
 
 ' -----------------------------------------------------------
+' Build SQL Script
+' -----------------------------------------------------------
+Public Function WriteSQL(NewLine As Boolean, Indent As Long, Script As String, Optional Reset As Boolean = False)
+    If Reset Then sSQLScript = vbNullString
+    sSQLScript = sSQLScript & IIf(NewLine, vbNewLine, vbNullString) & String(Indent, vbTab) & Script
+End Function
+
+' -----------------------------------------------------------
+' Execute a SQL script (INSERTS and UPDATES)
+' -----------------------------------------------------------
+Private Function IsConnectionOpen() As Boolean
+    Dim isActive As Boolean
+    If cnn Is Nothing Then
+        isActive = False
+    Else
+        If cnn.state = adStateOpen Then
+            isActive = True
+        Else
+            isActive = False
+        End If
+    End If
+    IsConnectionOpen = isActive
+End Function
+
+' -----------------------------------------------------------
+' Execute a SQL script (INSERTS and UPDATES)
+' -----------------------------------------------------------
+Public Function Execute(SQLScript As String)
+    If IsConnectionOpen Then cnn.Execute SQLScript
+End Function
+
+
+' -----------------------------------------------------------
 ' Execute a SQL script
 ' -----------------------------------------------------------
-Public Function Query(sqlScript As String) As Long
-    If cnn Is Nothing Then Exit Function
-    TearDownRecordset
-    Set rs = New ADODB.Recordset
-    ' Or use CreateObject method: Objects instantiated with CreateObject are late-bound,
-    ' which means that they are not strongly typed and command-line completion is disabled.
-    ' Instantiating objects by using the CreateObject method is typically slower than using the Dim statement(Dim rs As ADODB.Recordset).
-    ' Dim rs
-    ' Set rs = CreateObject("ADODB.Recordset")
-    With rs
-        .CursorLocation = adUseClient
-        .ActiveConnection = cnn
-        .CursorType = adOpenKeyset
-        .LockType = adLockOptimistic
-        .Open sqlScript
-        ' .Open sqlScript, cnn, adOpenKeyset, adLockOptimistic
-        On Error GoTo NoResult
-        Query = CLng(rs.RecordCount)
-        Exit Function
+Public Function Query(SQLScript As String) As Long
+    If IsConnectionOpen Then
+
+        TearDownRecordset
+        Set rs = New ADODB.Recordset
+        ' Or use CreateObject method: Objects instantiated with CreateObject are late-bound,
+        ' which means that they are not strongly typed and command-line completion is disabled.
+        ' Instantiating objects by using the CreateObject method is typically slower than using the Dim statement(Dim rs As ADODB.Recordset).
+        ' Dim rs
+        ' Set rs = CreateObject("ADODB.Recordset")
+        With rs
+            .CursorLocation = adUseClient
+            .ActiveConnection = cnn
+            .CursorType = adOpenKeyset
+            .LockType = adLockOptimistic
+            .Open SQLScript
+            ' .Open sqlScript, cnn, adOpenKeyset, adLockOptimistic
+            On Error GoTo NoResult
+            Query = CLng(rs.RecordCount)
+            Exit Function
 NoResult:
-        Query = 0
-    End With
+            Query = 0
+        End With
+    End If
 End Function
 
 
@@ -364,9 +405,9 @@ Sub TransferResultToRange(LeftTopCell As Range _
         
         If WithHeader Then
             For i = 0 To rs.Fields.Count - 1
-                LeftTopCell.offset(i, 0) = rs.Fields(i).name
+                LeftTopCell.Offset(i, 0) = rs.Fields(i).name
             Next i
-            Set LeftTopCell = LeftTopCell.offset(0, 1)
+            Set LeftTopCell = LeftTopCell.Offset(0, 1)
         End If  ' End of Creating Header
         ' Copy query result to LeftTopCell by resziing it to the shape of transposed result
         ' Please Note UBound and LBound Functions: UBound( ArrayName, [Dimension] ), [Dimension] : 1(rows), 2(columns)
@@ -375,10 +416,10 @@ Sub TransferResultToRange(LeftTopCell As Range _
     Else  ' No transpose : Headers from Top
         If WithHeader Then
             For i = 0 To rs.Fields.Count - 1
-                LeftTopCell.offset(0, i) = rs.Fields(i).name
+                LeftTopCell.Offset(0, i) = rs.Fields(i).name
             Next i
             ' Copy query result to LeftTopCell
-           Set LeftTopCell = LeftTopCell.offset(1, 0)
+           Set LeftTopCell = LeftTopCell.Offset(1, 0)
         End If  ' End of Creating Header
         ' Copy query result to LeftTopCell
         rs.MoveFirst
@@ -400,11 +441,11 @@ Sub TransferResultToTable(ByRef tbl As ListObject _
         ' Reset the Table
         If ResetTable Then
             ' Clear Everything
-            .Range.Resize(.Range.rows.Count - 1, .Range.Columns.Count).offset(1, 0).Clear
+            .Range.Resize(.Range.rows.Count - 1, .Range.Columns.Count).Offset(1, 0).Clear
             .HeaderRowRange.ClearContents
             If .HeaderRowRange.Columns.Count > rs.Fields.Count Then
                 Dim extraCols As Range
-                Set extraCols = .HeaderRowRange.Resize(1, .HeaderRowRange.Columns.Count - rs.Fields.Count).offset(0, rs.Fields.Count)
+                Set extraCols = .HeaderRowRange.Resize(1, .HeaderRowRange.Columns.Count - rs.Fields.Count).Offset(0, rs.Fields.Count)
                 .Resize .Range.Resize(rs.RecordCount + 1, rs.Fields.Count)
                 extraCols.Clear
             Else
@@ -425,16 +466,17 @@ Sub TransferResultToTable(ByRef tbl As ListObject _
         If AddToBottom Then
             Dim isRowEmpty As Boolean
             isRowEmpty = True
-            With .HeaderRowRange.offset(.Range.rows.Count - 1, 0)
+            ' Check if the last listRow in the Table is all Empty (Space Only will be count as blank)
+            With .HeaderRowRange.Offset(.Range.rows.Count - 1, 0)
                 For rowsOffset = 1 To .Cells.Count
-                    If Trim(.Resize(1, 1).offset(0, rowsOffset - 1)) <> "" Then isRowEmpty = False
+                    If Trim(.Resize(1, 1).Offset(0, rowsOffset - 1)) <> "" Then isRowEmpty = False
                 Next rowsOffset
             End With
             rowsOffset = IIf(isRowEmpty, .Range.rows.Count - 1, .Range.rows.Count)
         Else
             rowsOffset = 1
         End If
-         .Range.Resize(1, 1).offset(rowsOffset, 0).CopyFromRecordset rs
+         .Range.Resize(1, 1).Offset(rowsOffset, 0).CopyFromRecordset rs
     End With
 End Sub
 
