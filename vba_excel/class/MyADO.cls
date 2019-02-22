@@ -77,7 +77,7 @@ End Function
 ' Open Connection
 ' -----------------------------------------------------------
  Public Sub Connect(ConnString As String, Optional Timeout As Long = 15)
-    If ConnString = "" Then Exit Sub
+    If Trim(ConnString) = "" Then Exit Sub
     ' Close Current Connection
     TearDownConnection
     ' Setup a new connection
@@ -96,15 +96,7 @@ End Function
 End Sub
 
 ' -----------------------------------------------------------
-' Build SQL Script
-' -----------------------------------------------------------
-Public Function WriteSQL(NewLine As Boolean, Indent As Long, Script As String, Optional Reset As Boolean = False)
-    If Reset Then sSQLScript = vbNullString
-    sSQLScript = sSQLScript & IIf(NewLine, vbNewLine, vbNullString) & String(Indent, vbTab) & Script
-End Function
-
-' -----------------------------------------------------------
-' Execute a SQL script (INSERTS and UPDATES)
+' Check if the connection is open
 ' -----------------------------------------------------------
 Private Function IsConnectionOpen() As Boolean
     Dim isActive As Boolean
@@ -118,6 +110,14 @@ Private Function IsConnectionOpen() As Boolean
         End If
     End If
     IsConnectionOpen = isActive
+End Function
+
+' -----------------------------------------------------------
+' Build SQL Script
+' -----------------------------------------------------------
+Public Function WriteSQL(NewLine As Boolean, Indent As Long, Script As String, Optional Reset As Boolean = False)
+    If Reset Then sSQLScript = vbNullString
+    sSQLScript = sSQLScript & IIf(NewLine, vbNewLine, vbNullString) & String(Indent, vbTab) & Script
 End Function
 
 ' -----------------------------------------------------------
@@ -345,15 +345,14 @@ End Function
 '            "Driver={Microsoft Access Text Driver (*.txt; *.csv)};" & _
 '            "Dbq=" & filepath & ";"
     
-    
     BuildConnectionString_CSV = thisConnectionString
 End Function
 
 ' -----------------------------------------------------------
 ' Get Connection State
 ' -----------------------------------------------------------
- Function GetConnectionState(state As Integer) As String
-    Select Case CInt(state)
+ Public Function GetConnectionState() As String
+    Select Case CInt(cnn.state)
         Case adStateClosed
             GetConnectionState = "Closed"
         Case adStateOpen

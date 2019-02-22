@@ -8,16 +8,32 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 Option Explicit
+Private this_ScopeWorkbook As Workbook
 ' -----------------------------------------------------------
 ' Initializing
 ' -----------------------------------------------------------
 Private Sub Class_Initialize()
+    Set this_ScopeWorkbook = ThisWorkbook
 End Sub
 
 ' -----------------------------------------------------------
 ' Terminating : Clean up
 ' -----------------------------------------------------------
 Private Sub Class_Terminate()
+    Set this_ScopeWorkbook = Nothing
+End Sub
+
+
+Private Sub UseWorkbookScopeThis()
+    Set this_ScopeWorkbook = ThisWorkbook
+End Sub
+
+Private Sub UseWorkbookScopeActive()
+    Set this_ScopeWorkbook = ActiveWorkbook
+End Sub
+
+Private Sub UseWorkbookScopeExtername(FullPath As String)
+    Set this_ScopeWorkbook = Workbooks.Open(FullPath)
 End Sub
 
 '############################################################################################
@@ -97,12 +113,81 @@ End Function
 '############################################################################################
 ' Clear Table Content
 ' ############################################################################################
-Function ClearTableContent(Table As ListObject, Optional DefaultRows As Long = 3)
+Function ClearTableContent(Table As ListObject, Optional DefaultRows As Long = 3, Optional ClearFilter As Boolean = True)
     With Table
+        If ClearFilter Then
+            If .ShowAutoFilter Then
+                If .AutoFilter.FilterMode Then .AutoFilter.ShowAllData
+            End If
+        End If
         .Range.Resize(.Range.rows.Count - 1, .HeaderRowRange.Columns.Count).Offset(1, 0).ClearContents
         .Resize .Range.Resize(DefaultRows, .HeaderRowRange.Columns.Count)
     End With
 End Function
+
+'############################################################################################
+' Description : Create a New worksheet by copying from an existing sheet
+' Scope : Thisworkbook
+' Return Value :
+'    case      1 : (no sheet name is given or name does not exist )-> The new Worksheet
+'    case else : -> The existing Worksheet with the given sheet name
+' ############################################################################################
+Function CreateNewWorksheetFromExisting(TemplateSheet As Worksheet, AnchorSheetReference As Variant _
+    , Optional NewSheetName As String = vbNullString _
+    , Optional PlaceAfter As Boolean = True _
+    , Optional KeepCurrentActive As Boolean = True _
+    ) As Worksheet
+    
+    UseWorkbookScopeThis
+    
+    Dim wsOldActiveSheet As Worksheet
+    Set wsOldActiveSheet = this_ScopeWorkbook.ActiveSheet
+    
+    Dim wsNewSheet As Worksheet
+    Dim hasNewSheetName As Boolean
+    
+    ' Check if the New Sheet Name already exists. If yes, return the existing sheet instead
+    hasNewSheetName = Not (Trim(NewSheetName) = "")
+    If hasNewSheetName Then
+    On Error GoTo SheetDoNotExist:
+        Set wsNewSheet = this_ScopeWorkbook.Worksheets(NewSheetName)
+        Debug.Print "Given Worksheet name [ " & NewSheetName & " ] is occupied, Existing Sheet will be returned instead"
+        Set CreateNewWorksheetFromExisting = wsNewSheet
+        Exit Function
+SheetDoNotExist:
+    End If
+    
+    ' Starts to create new sheet
+    With TemplateSheet
+        ' The templae sheet must be visible before copying
+        Dim lngOriginalVisibleStatus As Long
+        lngOriginalVisibleStatus = .Visible
+        If Not lngOriginalVisibleStatus = xlSheetVisible Then .Visible = xlSheetVisible
+        
+        ' Either Create a new sheet from tempalte before or after the achor sheet
+        If PlaceAfter Then
+            .Copy After:=this_ScopeWorkbook.Worksheets(AnchorSheetReference)
+        Else
+            .Copy Before:=this_ScopeWorkbook.Worksheets(AnchorSheetReference)
+        End If
+        
+        ' Refer to the new sheet
+        Set wsNewSheet = this_ScopeWorkbook.ActiveSheet
+        
+        ' ReName the new sheet
+        If hasNewSheetName Then wsNewSheet.name = NewSheetName
+        
+        ' Restore templae sheet's original visible status
+        .Visible = lngOriginalVisibleStatus
+    End With
+    
+    ' Navigate back to the original activated sheet
+    If KeepCurrentActive Then wsOldActiveSheet.Activate
+    
+    ' Return the new sheet
+    Set CreateNewWorksheetFromExisting = wsNewSheet
+End Function
+
 
 '############################################################################################
 ' Refresh All Pivot Tables In a certain Sheet
@@ -434,13 +519,13 @@ End Function
 ' Get File Path and File Name From Full Path String
 ' Returns File Path and File Name in Array
 ' ############################################################################################
-Public Function SplitFullPath(fullPath As String, Optional NoExtensionName As Boolean = True) As String()
+Public Function SplitFullPath(FullPath As String, Optional NoExtensionName As Boolean = True) As String()
     Dim file, filename, fileExtension, filepath, result(3) As String
     Dim filePart, namePart As Variant
     
-    If Right(fullPath, 1) <> "\" And Len(fullPath) > 0 Then
+    If Right(FullPath, 1) <> "\" And Len(FullPath) > 0 Then
         ' Split the Reverse String into 2 parts from left by "\"
-        filePart = Split(StrReverse(fullPath), "\", 2)
+        filePart = Split(StrReverse(FullPath), "\", 2)
         file = StrReverse(filePart(0))
         If UBound(filePart) = LBound(filePart) Then
             filepath = vbNullString
@@ -622,6 +707,73 @@ Function ImportOneSheet(srcPath, srcWksIdx, destWks As Worksheet _
     Application.CutCopyMode = False
     Application.DisplayAlerts = True
 End Function
+
+
+'############################################################################################
+' Import Text Data to A sheet
+' ############################################################################################
+Sub ImportText(ImportString As String, ImportToSheet As Worksheet _
+    , Optional ConnectionName As String = vbNullString _
+    , Optional ImportToRow As Long = 1 _
+    , Optional ImportToColumn As Long = 1 _
+    , Optional SkipRows As Long = 0 _
+    , Optional ClearAllSheetNames As Boolean = True _
+    , Optional BackgroundQuery As Boolean = True _
+    )
+    If Trim(ImportString) = "" Then Exit Sub
+    
+    Dim qt As QueryTable
+    Dim nm As name
+    
+    ' Reset the sheet
+    With ImportToSheet
+        For Each qt In .QueryTables
+            ' Remove the Related Name from the Name manager also
+            If ClearAllSheetNames Then
+                For Each nm In ImportToSheet.Names
+                    If Left(nm.name, Len(ImportToSheet.name)) = ImportToSheet.name Then nm.Delete
+                Next nm
+            End If
+            
+            ' Remove Existing Query Table
+            qt.Delete
+        Next qt
+        
+        ' Clear The Sheet
+        .UsedRange.Clear
+    End With
+    
+    ' Import Text Data from external source
+    With ImportToSheet.QueryTables.Add(Connection:=ImportString, Destination:=ImportToSheet.Cells(ImportToRow, ImportToColumn))
+        .name = IIf(Trim(ConnectionName) = "", ImportString, ConnectionName)
+
+        .FieldNames = True
+        .RowNumbers = False
+        .FillAdjacentFormulas = False
+        .PreserveFormatting = True
+        .RefreshOnFileOpen = False
+        .RefreshStyle = xlInsertDeleteCells
+        .SavePassword = False
+        .SaveData = True
+        .AdjustColumnWidth = True
+        .RefreshPeriod = 0
+        .TextFilePromptOnRefresh = False
+        .TextFilePlatform = 850
+        .TextFileStartRow = SkipRows
+        .TextFileParseType = xlDelimited
+        .TextFileTextQualifier = xlTextQualifierDoubleQuote
+        ' Delimiter
+        .TextFileConsecutiveDelimiter = False
+        .TextFileTabDelimiter = True
+        .TextFileSemicolonDelimiter = False
+        .TextFileCommaDelimiter = False
+        .TextFileSpaceDelimiter = False
+        ' Data Types
+        .TextFileColumnDataTypes = Array(1, 1, 1, 1, 1, 1)
+        .TextFileTrailingMinusNumbers = True
+        .Refresh BackgroundQuery:=BackgroundQuery
+    End With
+End Sub
 
 '############################################################################################
 ' Check If a Key Exists in a Collection
