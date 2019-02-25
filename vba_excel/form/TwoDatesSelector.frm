@@ -13,7 +13,6 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
-
 Option Explicit
 Private SubmitFunc, ExternalFileFunc As String
 Private ActiveDate As Byte
@@ -188,7 +187,7 @@ Private Sub date1_frame_Enter()
     With Me
         .date1_frame.BackColor = vbCyan
         .date2_frame.BackColor = RGB(200, 200, 200)
-        .cud_frame.Caption = "Currently Apply to Date From"
+        .cud_frame.caption = "Currently Apply to Date From"
     End With
 End Sub
 
@@ -197,7 +196,7 @@ Private Sub date2_frame_Enter()
     With Me
         .date1_frame.BackColor = RGB(200, 200, 200)
         .date2_frame.BackColor = vbCyan
-        .cud_frame.Caption = "Currently Apply to Date To"
+        .cud_frame.caption = "Currently Apply to Date To"
     End With
 End Sub
 
@@ -244,7 +243,7 @@ End Sub
 ' ************************************************************************************************************
 Public Function RegisterButtonFunc_Submit(FuncName As String, Optional BtnActionText As String = vbNullString)
     SubmitFunc = FuncName
-    Me.SUBMIT.Caption = "Submit Both Dates for " & IIf(Trim(BtnActionText) = vbNullString, "Action", BtnActionText)
+    Me.SUBMIT.caption = "Submit Both Dates for " & IIf(Trim(BtnActionText) = vbNullString, "Action", BtnActionText)
 End Function
 
 Public Function RegisterButtonFunc_ExternalFile(FuncName As String)
@@ -254,13 +253,7 @@ End Function
 Public Function DisableButton_ExternalFile()
     With Me
         .EXTERNALFILE.Enabled = False
-        .label_external_file_path.Caption = "Disabled"
-    End With
-End Function
-
-Public Function SetTitle(title As String)
-    With Me
-        .Caption = title
+        .label_external_file_path.caption = "Disabled"
     End With
 End Function
 
@@ -298,7 +291,23 @@ Private Sub EXTERNALFILE_Click()
     ' The File Full Path will/should be the only input variable for the wrapped Function
     If fullPath <> "" And (Not (IsNull(fullPath))) Then
         ' Update the Label
-        Me.label_external_file_path.Caption = fullPath
+        Me.label_external_file_path.caption = fullPath
+        ' Change the Date By reading the File Name
+        On Error GoTo ReadDateError:
+        Dim filePart As Variant
+        filePart = Split(StrReverse(fullPath), "_")   ' Reverse the String
+        Dim dStr1, dStr2 As String
+        dStr1 = StrReverse(filePart(2))
+        dStr2 = StrReverse(filePart(1))
+        Dim date1, date2 As Date
+        date1 = DateSerial(CInt(Left(dStr1, 4)), CInt(Mid(dStr1, 5, 2)), CInt(Right(dStr1, 2)))
+        date2 = DateSerial(CInt(Left(dStr2, 4)), CInt(Mid(dStr2, 5, 2)), CInt(Right(dStr2, 2)))
+        PopulateDate CDate(date1), 1
+        PopulateDate CDate(date2), 2
+        
+        Me.label_external_file_path.caption = fullPath & vbNewLine & "[ Now Date ] will be set to " & date2 + 1
+        
+ReadDateError:
         ' Execute the anonymous function
         If ExternalFileFunc = vbNullString Then Exit Sub
         Application.Run ExternalFileFunc, fullPath
@@ -360,7 +369,7 @@ Private Function PopulateDate(dt As Date, Which As Byte)
     Dim item As Integer
     If CByte(Which) = 1 Then
         With Me
-            .date1_label_show.Caption = Format(dt, "ddd, dd mmm yyyy") & "/ FY" & Right(CStr(year(dt) + IIf(month(dt) < 7, 0, 1)), 2)
+            .date1_label_show.caption = Format(dt, "ddd, dd mmm yyyy") & "/ FY" & Right(CStr(year(dt) + IIf(month(dt) < 7, 0, 1)), 2)
             .date1_year1.text = Mid(year(dt), 1, 1)
             .date1_year2.text = Mid(year(dt), 2, 1)
             .date1_year3.text = Mid(year(dt), 3, 1)
@@ -373,7 +382,7 @@ Private Function PopulateDate(dt As Date, Which As Byte)
         End With
     Else
         With Me
-            .date2_label_show.Caption = Format(dt, "ddd, dd mmm yyyy") & "/ FY" & Right(CStr(year(dt) + IIf(month(dt) < 7, 0, 1)), 2)
+            .date2_label_show.caption = Format(dt, "ddd, dd mmm yyyy") & "/ FY" & Right(CStr(year(dt) + IIf(month(dt) < 7, 0, 1)), 2)
             .date2_year1.text = Mid(year(dt), 1, 1)
             .date2_year2.text = Mid(year(dt), 2, 1)
             .date2_year3.text = Mid(year(dt), 3, 1)
@@ -407,52 +416,52 @@ Private Function ValidateDate(Which As Byte) As Boolean
             ' Number Only
             If valid And Not IsNumeric(.date1_year1.text) Then
                 valid = False
-                .date1_label_show.Caption = "only numeric value allowed"
+                .date1_label_show.caption = "only numeric value allowed"
                 .date1_year1.BackColor = vbRed
             End If
             If valid And Not IsNumeric(.date1_year2.text) Then
                 valid = False
-                .date1_label_show.Caption = "only numeric value allowed"
+                .date1_label_show.caption = "only numeric value allowed"
                 .date1_year2.BackColor = vbRed
             End If
             If valid And Not IsNumeric(.date1_year3.text) Then
                 valid = False
-                .date1_label_show.Caption = "only numeric value allowed"
+                .date1_label_show.caption = "only numeric value allowed"
                 .date1_year3.BackColor = vbRed
             End If
             If valid And Not IsNumeric(.date1_year4.text) Then
                 valid = False
-                .date1_label_show.Caption = "only numeric value allowed"
+                .date1_label_show.caption = "only numeric value allowed"
                 .date1_year4.BackColor = vbRed
             End If
             ' Only One Digit
             If valid And Len(.date1_year1.text) <> 1 Then
                 valid = False
-                .date1_label_show.Caption = "only one digit needed"
+                .date1_label_show.caption = "only one digit needed"
                 .date1_year1.BackColor = vbRed
             End If
             If valid And Len(.date1_year2.text) <> 1 Then
                 valid = False
-                .date1_label_show.Caption = "only one digit needed"
+                .date1_label_show.caption = "only one digit needed"
                 .date1_year2.BackColor = vbRed
             End If
             If valid And Len(.date1_year3.text) <> 1 Then
                 valid = False
-                .date1_label_show.Caption = "only one digit needed"
+                .date1_label_show.caption = "only one digit needed"
                 .date1_year3.BackColor = vbRed
             End If
             If valid And Len(.date1_year4.text) <> 1 Then
                 valid = False
-                .date1_label_show.Caption = "only one digit needed"
+                .date1_label_show.caption = "only one digit needed"
                 .date1_year4.BackColor = vbRed
             End If
             If valid And CInt(.date1_month.ListIndex) < 0 Or CInt(.date1_month.ListIndex) > 12 Then
-                .date1_label_show.Caption = "invalid month input"
+                .date1_label_show.caption = "invalid month input"
                 .date1_month.BackColor = vbRed
                 valid = False
             End If
             If valid And CInt(.date1_day.text) < 0 Or CInt(.date1_day.text) > 31 Then
-                .date1_label_show.Caption = "invalid day input"
+                .date1_label_show.caption = "invalid day input"
                 .date1_day.BackColor = vbRed
                 valid = False
             End If
@@ -470,52 +479,52 @@ Private Function ValidateDate(Which As Byte) As Boolean
             ' Number Only
             If valid And Not IsNumeric(.date2_year1.text) Then
                 valid = False
-                .date2_label_show.Caption = "only numeric value allowed"
+                .date2_label_show.caption = "only numeric value allowed"
                 .date2_year1.BackColor = vbRed
             End If
             If valid And Not IsNumeric(.date2_year2.text) Then
                 valid = False
-                .date2_label_show.Caption = "only numeric value allowed"
+                .date2_label_show.caption = "only numeric value allowed"
                 .date2_year2.BackColor = vbRed
             End If
             If valid And Not IsNumeric(.date2_year3.text) Then
                 valid = False
-                .date2_label_show.Caption = "only numeric value allowed"
+                .date2_label_show.caption = "only numeric value allowed"
                 .date2_year3.BackColor = vbRed
             End If
             If valid And Not IsNumeric(.date2_year4.text) Then
                 valid = False
-                .date2_label_show.Caption = "only numeric value allowed"
+                .date2_label_show.caption = "only numeric value allowed"
                 .date2_year4.BackColor = vbRed
             End If
             ' Only One Digit
             If valid And Len(.date2_year1.text) <> 1 Then
                 valid = False
-                .date2_label_show.Caption = "only one digit needed"
+                .date2_label_show.caption = "only one digit needed"
                 .date2_year1.BackColor = vbRed
             End If
             If valid And Len(.date2_year2.text) <> 1 Then
                 valid = False
-                .date2_label_show.Caption = "only one digit needed"
+                .date2_label_show.caption = "only one digit needed"
                 .date2_year2.BackColor = vbRed
             End If
             If valid And Len(.date2_year3.text) <> 1 Then
                 valid = False
-                .date2_label_show.Caption = "only one digit needed"
+                .date2_label_show.caption = "only one digit needed"
                 .date2_year3.BackColor = vbRed
             End If
             If valid And Len(.date2_year4.text) <> 1 Then
                 valid = False
-                .date2_label_show.Caption = "only one digit needed"
+                .date2_label_show.caption = "only one digit needed"
                 .date2_year4.BackColor = vbRed
             End If
             If valid And CInt(.date2_month.ListIndex) < 0 Or CInt(.date2_month.ListIndex) > 12 Then
-                .date2_label_show.Caption = "invalid month input"
+                .date2_label_show.caption = "invalid month input"
                 .date2_month.BackColor = vbRed
                 valid = False
             End If
             If valid And CInt(.date2_day.text) < 0 Or CInt(.date2_day.text) > 31 Then
-                .date2_label_show.Caption = "invalid day input"
+                .date2_label_show.caption = "invalid day input"
                 .date2_day.BackColor = vbRed
                 valid = False
             End If

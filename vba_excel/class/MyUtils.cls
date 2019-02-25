@@ -8,32 +8,32 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 Option Explicit
-Private this_ScopeWorkbook As Workbook
-' -----------------------------------------------------------
-' Initializing
-' -----------------------------------------------------------
+Private this_ScopeWorkbook As Workbook  ' WorkBook Context for functions or procedures
+' --------------------------------------------------------------------
+' Initializing Class
+' --------------------------------------------------------------------
 Private Sub Class_Initialize()
     Set this_ScopeWorkbook = ThisWorkbook
 End Sub
 
-' -----------------------------------------------------------
-' Terminating : Clean up
-' -----------------------------------------------------------
+' --------------------------------------------------------------------
+' Terminating Class
+' --------------------------------------------------------------------
 Private Sub Class_Terminate()
     Set this_ScopeWorkbook = Nothing
 End Sub
 
-
+' --------------------------------------------------------------------
+' Switching Workbook Context to ThisWorkbook
+' --------------------------------------------------------------------
 Private Sub UseWorkbookScopeThis()
     Set this_ScopeWorkbook = ThisWorkbook
 End Sub
-
+' --------------------------------------------------------------------
+' Switching Workbook Context to ActiveWorkbook
+' --------------------------------------------------------------------
 Private Sub UseWorkbookScopeActive()
     Set this_ScopeWorkbook = ActiveWorkbook
-End Sub
-
-Private Sub UseWorkbookScopeExtername(FullPath As String)
-    Set this_ScopeWorkbook = Workbooks.Open(FullPath)
 End Sub
 
 '############################################################################################
@@ -101,9 +101,9 @@ Function IsTableLastRowEmpty(Table As ListObject) As Boolean
     Dim i As Long
     isRowEmpty = True
     With Table
-        With .HeaderRowRange.Offset(.Range.rows.Count - 1, 0)
+        With .HeaderRowRange.offset(.Range.rows.Count - 1, 0)
             For i = 1 To .Cells.Count
-                If Trim(.Resize(1, 1).Offset(0, i - 1)) <> "" Then isRowEmpty = False
+                If Trim(.Resize(1, 1).offset(0, i - 1)) <> "" Then isRowEmpty = False
             Next i
         End With
     End With
@@ -120,7 +120,7 @@ Function ClearTableContent(Table As ListObject, Optional DefaultRows As Long = 3
                 If .AutoFilter.FilterMode Then .AutoFilter.ShowAllData
             End If
         End If
-        .Range.Resize(.Range.rows.Count - 1, .HeaderRowRange.Columns.Count).Offset(1, 0).ClearContents
+        .Range.Resize(.Range.rows.Count - 1, .HeaderRowRange.Columns.Count).offset(1, 0).ClearContents
         .Resize .Range.Resize(DefaultRows, .HeaderRowRange.Columns.Count)
     End With
 End Function
@@ -128,62 +128,91 @@ End Function
 '############################################################################################
 ' Description : Create a New worksheet by copying from an existing sheet
 ' Scope : Thisworkbook
-' Return Value :
-'    case      1 : (no sheet name is given or name does not exist )-> The new Worksheet
-'    case else : -> The existing Worksheet with the given sheet name
+' Return Value : The new Worksheet or The existing Worksheet with the given sheet name
 ' ############################################################################################
-Function CreateNewWorksheetFromExisting(TemplateSheet As Worksheet, AnchorSheetReference As Variant _
+Function CreateNewWorksheetFromExisting(TemplateSheet As Worksheet _
     , Optional NewSheetName As String = vbNullString _
+    , Optional AnchorSheetRef As Variant = vbNullString _
     , Optional PlaceAfter As Boolean = True _
+    , Optional RemoveDuplicateNames As Boolean = True _
+    , Optional ForceVisible As Boolean = True _
     , Optional KeepCurrentActive As Boolean = True _
     ) As Worksheet
     
     UseWorkbookScopeThis
     
     Dim wsOldActiveSheet As Worksheet
-    Set wsOldActiveSheet = this_ScopeWorkbook.ActiveSheet
-    
+    Dim wsAnchorSheet As Worksheet
     Dim wsNewSheet As Worksheet
+    
+    Dim newSheetIndex As Long
     Dim hasNewSheetName As Boolean
+    
+    ' Remember the current Avtive Sheet
+    Set wsOldActiveSheet = this_ScopeWorkbook.ActiveSheet
     
     ' Check if the New Sheet Name already exists. If yes, return the existing sheet instead
     hasNewSheetName = Not (Trim(NewSheetName) = "")
     If hasNewSheetName Then
-    On Error GoTo SheetDoNotExist:
+        Set wsNewSheet = Nothing
+        On Error Resume Next
         Set wsNewSheet = this_ScopeWorkbook.Worksheets(NewSheetName)
-        Debug.Print "Given Worksheet name [ " & NewSheetName & " ] is occupied, Existing Sheet will be returned instead"
-        Set CreateNewWorksheetFromExisting = wsNewSheet
-        Exit Function
-SheetDoNotExist:
+       ' If the above code executed successfully, wsNewSheet is now refering to the existing sheet with the given name
+        If Not wsNewSheet Is Nothing Then
+            Debug.Print "Given Worksheet name [ " & NewSheetName & " ] is occupied, Existing Sheet will be returned instead"
+            If Not KeepCurrentActive Then wsNewSheet.Activate
+            Set CreateNewWorksheetFromExisting = wsNewSheet
+            Exit Function
+        End If
     End If
-    
-    ' Starts to create new sheet
+
+    ' Starts to create new sheet when no sheet name is given or given name does not exist
     With TemplateSheet
-        ' The templae sheet must be visible before copying
-        Dim lngOriginalVisibleStatus As Long
-        lngOriginalVisibleStatus = .Visible
-        If Not lngOriginalVisibleStatus = xlSheetVisible Then .Visible = xlSheetVisible
+        ' The AnchorSheetReference will be default to the last sheet of the context workbook if not given
+        If Trim(CStr(AnchorSheetRef)) = vbNullString Then AnchorSheetRef = this_ScopeWorkbook.Sheets.Count
         
+        ' Remember the Anchor Sheet
+        Set wsAnchorSheet = this_ScopeWorkbook.Worksheets(AnchorSheetRef)
+
         ' Either Create a new sheet from tempalte before or after the achor sheet
         If PlaceAfter Then
-            .Copy After:=this_ScopeWorkbook.Worksheets(AnchorSheetReference)
+            .Copy After:=wsAnchorSheet
+            newSheetIndex = wsAnchorSheet.Index + 1
         Else
-            .Copy Before:=this_ScopeWorkbook.Worksheets(AnchorSheetReference)
+            .Copy Before:=wsAnchorSheet
+             newSheetIndex = wsAnchorSheet.Index - 1
         End If
         
-        ' Refer to the new sheet
-        Set wsNewSheet = this_ScopeWorkbook.ActiveSheet
+        ' Remember to the new sheet
+        Set wsNewSheet = this_ScopeWorkbook.Worksheets(newSheetIndex)
         
-        ' ReName the new sheet
-        If hasNewSheetName Then wsNewSheet.name = NewSheetName
+        ' Setup the new sheet
+        With wsNewSheet
+            ' Set new sheet to become visible (if the template was hidden, new sheet will be hidden as well)
+            If ForceVisible Then .Visible = xlSheetVisible
+            ' ReName the new sheet if a name' been given
+            If hasNewSheetName Then .name = NewSheetName
+        End With
         
-        ' Restore templae sheet's original visible status
-        .Visible = lngOriginalVisibleStatus
+        ' Remove the named variables that were copied across
+        If RemoveDuplicateNames Then
+            Dim newName As name, oldName As name
+            For Each newName In wsNewSheet.Names
+                Set oldName = Nothing
+                ' Delete all worksheet level names that were workbook level names in the template
+                If TypeOf newName.Parent Is Worksheet Then
+                    ' If this worksheet name is also in template sheet and is workbook level then it can be deleted
+                    On Error Resume Next
+                    Set oldName = .Names(Right(newName.name, Len(newName.name) - InStr(newName.name, "!")))
+                    ' The name of the Name object is not a worksheet level name if oldName is nothing
+                    If oldName Is Nothing Then newName.Delete  ' This worksheet level name is not a worksheet level name in template (must be workbook level), then it can be deleted
+                End If
+            Next newName
+        End If
     End With
-    
+
     ' Navigate back to the original activated sheet
     If KeepCurrentActive Then wsOldActiveSheet.Activate
-    
     ' Return the new sheet
     Set CreateNewWorksheetFromExisting = wsNewSheet
 End Function
@@ -208,7 +237,7 @@ Function Transpose2DArray(Arr As Variant, Optional ForceBaseX As Integer = -1, O
     ' The array cannot contain any Null values (5, Invalid procedure call or argument)
     ' The array cannot contain any items longer than 255 characters (1004, application defined or object defined error)
     
-    Dim x As Long, y As Long, xLength As Long, yLength As Long, xLower As Long, yLower As Long, xUpper As Long, yUpper As Long
+    Dim X As Long, Y As Long, xLength As Long, yLength As Long, xLower As Long, yLower As Long, xUpper As Long, yUpper As Long
     Dim tempArray As Variant
     
     xLower = LBound(Arr, 2)
@@ -230,11 +259,11 @@ Function Transpose2DArray(Arr As Variant, Optional ForceBaseX As Integer = -1, O
     End If
     
     ReDim tempArray(xLower To xUpper, yLower To yUpper)
-    For x = xLower To xUpper
-        For y = yLower To yUpper
-            tempArray(x, y) = Arr(y, x)
-        Next y
-    Next x
+    For X = xLower To xUpper
+        For Y = yLower To yUpper
+            tempArray(X, Y) = Arr(Y, X)
+        Next Y
+    Next X
     
     Transpose2DArray = tempArray
 End Function
@@ -298,7 +327,7 @@ Function AddCommentsToRange(rng As Range, text As String _
                 .Visible = Visible
                 .shape.TextFrame.AutoSize = True
                 .shape.Top = IIf(Top, Top, cell.Top)
-                .shape.Left = IIf(Left, Left, cell.Offset(0, 1).Left - .shape.Width)
+                .shape.Left = IIf(Left, Left, cell.offset(0, 1).Left - .shape.Width)
             End With
         End With
 EndLoop:
@@ -309,14 +338,14 @@ End Function
 ' Register OnAction Attribute to Button, Shape etc
 ' ############################################################################################
 Function BuildOnActionString(FuncName As String, Optional argArr = vbNullChar)
-    Dim x As Long
+    Dim X As Long
     Dim result As String
     result = "'" & CStr(FuncName) & " "
 
     If IsArray(argArr) Then
-        For x = LBound(argArr) To UBound(argArr)
-            result = result & """" & CStr(argArr(x)) & """"
-        Next x
+        For X = LBound(argArr) To UBound(argArr)
+            result = result & """" & CStr(argArr(X)) & """"
+        Next X
     Else
         If argArr <> vbNullChar Then result = result & """" & CStr(argArr) & """"
     End If
@@ -408,7 +437,7 @@ On Error GoTo errHandler
             IgnorePrintAreas:=False, _
             OpenAfterPublish:=False
 
-        MsgBox "PDF file has been successfully created ! ", vbOKOnly, "( / �__�)/ "
+        MsgBox "PDF file has been successfully created ! ", vbOKOnly, "( / ?__?)/ "
     End If
 
 exitHandler:
@@ -446,7 +475,7 @@ On Error GoTo errHandler
     ActiveWindow.SelectedSheets.PrintOut FROM:=1, To:=1, Copies:=1, Collate _
     :=True
 
-    MsgBox "Your Printint Command has been sent to the printer", vbOKOnly, "( / �__�)/ "
+    MsgBox "Your Printint Command has been sent to the printer", vbOKOnly, "( / ?__?)/ "
 
 exitHandler:
     Exit Sub
@@ -519,13 +548,13 @@ End Function
 ' Get File Path and File Name From Full Path String
 ' Returns File Path and File Name in Array
 ' ############################################################################################
-Public Function SplitFullPath(FullPath As String, Optional NoExtensionName As Boolean = True) As String()
+Public Function SplitFullPath(fullPath As String, Optional NoExtensionName As Boolean = True) As String()
     Dim file, filename, fileExtension, filepath, result(3) As String
     Dim filePart, namePart As Variant
     
-    If Right(FullPath, 1) <> "\" And Len(FullPath) > 0 Then
+    If Right(fullPath, 1) <> "\" And Len(fullPath) > 0 Then
         ' Split the Reverse String into 2 parts from left by "\"
-        filePart = Split(StrReverse(FullPath), "\", 2)
+        filePart = Split(StrReverse(fullPath), "\", 2)
         file = StrReverse(filePart(0))
         If UBound(filePart) = LBound(filePart) Then
             filepath = vbNullString
@@ -555,7 +584,7 @@ End Function
 ' Open a File Explorer
 ' Returns the File Path that you selected
 ' ############################################################################################
-Public Function OpenFileExplorer(Optional title As String = "Open a file", Optional default As String = vbNullString) As String
+Public Function OpenFileExplorer(Optional title As String = "Open a file", Optional Default As String = vbNullString) As String
 
 On Error GoTo Errhandling:
 
@@ -570,8 +599,8 @@ With fd
     .title = title
     
     ' Default Path
-    If Trim(default) <> "" Then
-        .InitialFileName = default
+    If Trim(Default) <> "" Then
+        .InitialFileName = Default
     Else
         .InitialFileName = ThisWorkbook.Path & "\"
     End If
@@ -662,19 +691,19 @@ Function ImportOneSheet(srcPath, srcWksIdx, destWks As Worksheet _
         ' Process the table
         With destWks.ListObjects(toTableIdx)
             ' Remove the Content
-            .Range.Offset(1, 0).ClearContents
+            .Range.offset(1, 0).ClearContents
             ' Shrink the Table
             If withTitle Then
                 .Resize .Range.Resize(3, .HeaderRowRange.Columns.Count)
                 ' Define Destination
-                Set destRng = .HeaderRowRange.Resize(1, 1).Offset(0, 0)
+                Set destRng = .HeaderRowRange.Resize(1, 1).offset(0, 0)
             Else
                 Dim beforeHeaderRng As Range
-                Set beforeHeaderRng = .HeaderRowRange.Offset(0, 1)
+                Set beforeHeaderRng = .HeaderRowRange.offset(0, 1)
                 .Resize .Range.Resize(3, 1)
                 beforeHeaderRng.Clear
                 ' Define Destination
-                Set destRng = .HeaderRowRange.Resize(1, 1).Offset(1, 0)
+                Set destRng = .HeaderRowRange.Resize(1, 1).offset(1, 0)
             End If
         End With
     Else
@@ -794,11 +823,9 @@ End Function
 ' ############################################################################################
 Function RemoveExtraSpaceFromString(str As String) As String
     With CreateObject("VBScript.RegExp")
-        .pattern = "\s+"
+        .Pattern = "\s+"
         .Global = True
         RemoveExtraSpaceFromString = .Replace(str, " ")
     End With
 End Function
-
-
 
