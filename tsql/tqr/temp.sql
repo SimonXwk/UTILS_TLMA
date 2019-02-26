@@ -74,14 +74,45 @@ cte_decimal AS (SELECT * FROM (VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)) A
       CASE WHEN RTRIM(C1.OTHERINITIAL)='' OR C1.OTHERINITIAL IS NULL THEN '' ELSE TRIM(C1.OTHERINITIAL) + ' ' END,
       RTRIM(C1.KEYNAME)
     ) AS [CONTACT_FULLNAME]
+    , C1.FIRSTNAME, C1.KEYNAME
     , C1.CONTACTTYPE, C1.PRIMARYCATEGORY, C1.SOURCE
-    , C1.GENDER
+    , CASE WHEN UPPER(RTRIM(C1.GENDER)) = 'MALE' THEN 'M'
+      ELSE
+        CASE WHEN UPPER(RTRIM(C1.GENDER)) = 'FEMALE' THEN 'F'
+        ELSE
+          CASE WHEN RTRIM(C1.GENDER) = '' OR C1.GENDER IS NULL
+          THEN NULL
+          ELSE UPPER(RTRIM(C1.GENDER))
+          END
+        END
+      END AS [GENDER]
     , C1.DATEOFBIRTH
     , (DATEDIFF(day, C1.DATEOFBIRTH, CURRENT_TIMESTAMP)+1)/365 AS [AGE]
     , CASE WHEN C1.DATEOFBIRTH IS NULL THEN 'No Date of Birth' ELSE C3.GENERATION END AS [GENERATION]
     , CASE WHEN C1.DATEOFBIRTH IS NULL THEN '00.NoDoB' ELSE C3.GENERATION_ABBREVATION END AS [GENERATION_ABBREVATION]
     , C1.ADDRESSLINE1, C1.ADDRESSLINE2, C1.ADDRESSLINE3 AS [SUBURB]
     , UPPER(LTRIM(RTRIM(C1.ADDRESSLINE4))) AS [STATE]
+    , CASE WHEN C1.ADDRESSLINE4 IS NULL OR RTRIM(C1.ADDRESSLINE4) = ''
+      THEN -- TYPE1 (When State is blank)
+        CASE WHEN C1.COUNTRY IS NULL OR RTRIM(C1.COUNTRY) = '' OR ( UPPER(LEFT(LTRIM(C1.COUNTRY), 2)) = 'AU' AND UPPER(LTRIM(RTRIM(C1.COUNTRY))) <> 'AUSTRIA' )
+        THEN 'AUSTRALIA'
+        ELSE UPPER(LTRIM(RTRIM(C1.COUNTRY)))
+        END
+      ELSE
+        CASE WHEN UPPER(LTRIM(RTRIM(C1.ADDRESSLINE4))) IN ('VIC','NSW','SA','QLD','WA','TAS','ACT','NT')
+        THEN -- TYPE2 (When State is AU)
+          CASE WHEN C1.COUNTRY IS NULL OR RTRIM(C1.COUNTRY) = '' OR ( UPPER(LEFT(LTRIM(C1.COUNTRY), 2)) = 'AU' AND UPPER(LTRIM(RTRIM(C1.COUNTRY))) <> 'AUSTRIA' )
+          THEN 'AUSTRALIA'
+          ELSE UPPER(LTRIM(RTRIM(C1.COUNTRY)))
+          END
+        ELSE -- TYPE3 (When State is Non-AU)
+          CASE WHEN C1.COUNTRY IS NULL OR RTRIM(C1.COUNTRY) = '' OR ( UPPER(LEFT(LTRIM(C1.COUNTRY), 2)) <> 'AU' OR UPPER(LTRIM(RTRIM(C1.COUNTRY))) = 'AUSTRIA' )
+          THEN UPPER(LTRIM(RTRIM(C1.COUNTRY)))
+          ELSE 'ERROR'
+          END
+        END
+      END AS [COUNTRY]
+--     , UPPER(LTRIM(RTRIM(C1.COUNTRY))) AS [COUNTRY]
     , CASE WHEN C1.ADDRESSLINE4 IS NULL OR RTRIM(C1.ADDRESSLINE4) = ''
       THEN -- TYPE1 (When State is blank)
         CASE WHEN C1.COUNTRY IS NULL OR RTRIM(C1.COUNTRY) = '' OR ( UPPER(LEFT(LTRIM(C1.COUNTRY), 2)) = 'AU' AND UPPER(LTRIM(RTRIM(C1.COUNTRY))) <> 'AUSTRIA' )
@@ -103,9 +134,16 @@ cte_decimal AS (SELECT * FROM (VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)) A
         END
       END AS [STATECOUNTRY]
     , C1.POSTCODE
-    , UPPER(LTRIM(RTRIM(C1.COUNTRY))) AS [COUNTRY]
+
 
     , C1.DONOTMAILREASON, C1.DONOTMAILFROM, C1.DONOTMAILUNTIL
+    , C1.[MOBILENUMBER]
+    , C1.[DAYTELEPHONE]
+    , C1.[EVENINGTELEPHONE]
+    , LTRIM(RTRIM(C1.EMAILADDRESS)) AS [EMAILADDRESS]
+    , LTRIM(RTRIM(C1.TWITTERHANDLE)) AS [TWITTERHANDLE]
+    , LTRIM(RTRIM(C1.FACEBOOKURL)) AS [FACEBOOKURL]
+    , LTRIM(RTRIM(C1.LINKEDINURL)) AS [LINKEDINURL]
     -- Filters
     , CASE WHEN C1.CONTACTTYPE='Organisation' THEN -1 ELSE 0 END AS [FILTER_ORGANISATION]
     , CASE WHEN C1.CONTACTTYPE='Organisation'
@@ -496,7 +534,7 @@ FROM
   LEFT OUTER JOIN Tbl_SOURCECODE                S1 ON (B1.SOURCECODE = S1.SOURCECODE)
 WHERE
   (B2.REVERSED IS NULL OR NOT(B2.REVERSED IN (1, -1))) AND (B4.STAGE ='Batch Approved')
-  AND B2.DATEOFPAYMENT BETWEEN @PAYMENT_DATE1 AND @PAYMENT_DATE2
+  -- AND B2.DATEOFPAYMENT BETWEEN @PAYMENT_DATE1 AND @PAYMENT_DATE2
 )
 -- ----------------------------------------------------------------------------------------------------
 , cte_first_payment_date AS (
@@ -602,9 +640,18 @@ WHERE
     LEFT JOIN cte_market_cycle t3 ON (SUBSTRING(t1.ACTIVITY_CODE, 3, 2) = t3.CODE)
 )
 -- ----------------------------------------------------------------------------------------------------
+, cte_payments_with_donor_type_and_detail AS (
+  SELECT
+    t1.*, t2.*
+  FROM
+    cte_payments_with_donor_type t1
+    LEFT JOIN cte_contacts t2 ON (t1.SERIALNUMBER = t2.SN)
+)
+
+-- ----------------------------------------------------------------------------------------------------
 /*<BASE_QUERY>*/
 select *
-from /*<BASE_QUERY_TABLE>*/cte_payments_with_first_date/*</BASE_QUERY_TABLE>*/
+from /*<BASE_QUERY_TABLE>*/cte_payments/*</BASE_QUERY_TABLE>*/
 /*</BASE_QUERY>*/
 -- ----------------------------------------------------------------------------------------------------
 -- OPTION(RECOMPILE)

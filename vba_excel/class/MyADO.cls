@@ -14,7 +14,9 @@ Private cnn As ADODB.Connection
 Private rs As ADODB.Recordset
 Private thisConnectionString As String
 Private strProvider, strDataSrc, strExtendedProperties As String
-Private sSQLScript As String
+Private strSQLScript As String
+Private strCTEScript As String
+
 ' -----------------------------------------------------------
 ' Initializing
 ' -----------------------------------------------------------
@@ -40,7 +42,11 @@ Public Property Get Connection() As ADODB.Connection
 End Property
 
 Public Property Get SQLScript() As String
-    SQLScript = sSQLScript
+    SQLScript = strSQLScript
+End Property
+
+Public Property Get CTEScript() As String
+    CTEScript = strCTEScript
 End Property
 
 ' -----------------------------------------------------------
@@ -50,7 +56,7 @@ End Property
     TearDownRecordset
     TearDownConnection
     thisConnectionString = vbNullString
-    sSQLScript = vbNullString
+    strSQLScript = vbNullString
 End Function
 
 ' -----------------------------------------------------------
@@ -116,8 +122,21 @@ End Function
 ' Build SQL Script
 ' -----------------------------------------------------------
 Public Function WriteSQL(NewLine As Boolean, Indent As Long, Script As String, Optional Reset As Boolean = False)
-    If Reset Then sSQLScript = vbNullString
-    sSQLScript = sSQLScript & IIf(NewLine, vbNewLine, vbNullString) & String(Indent, vbTab) & Script
+    If Reset Then strSQLScript = vbNullString
+    strSQLScript = strSQLScript & IIf(NewLine, vbNewLine, vbNullString) & String(Indent, vbTab) & Script
+End Function
+
+' -----------------------------------------------------------
+' Build CTE Script
+' -----------------------------------------------------------
+Public Function WriteCTEStart()
+    strSQLScript = "("
+End Function
+Public Function WriteCTEStop(Alias As String)
+    strSQLScript = ") " & Alias
+End Function
+Public Function WriteCTE(NewLine As Boolean, Indent As Long, Script As String)
+    strCTEScript = strCTEScript & IIf(NewLine, vbNewLine, vbNullString) & String(Indent, vbTab) & Script
 End Function
 
 ' -----------------------------------------------------------
@@ -181,15 +200,15 @@ End Function
 ' Build a Query Area String
 ' -----------------------------------------------------------
 Public Function GetQueryAreaStringFromTable(Sheet As Worksheet _
-    , Optional TableNameOrIndex As Variant = 1 _
+    , Optional TableRef As Variant = 1 _
     , Optional Alias As String = vbNullString _
     ) As String
-    With Sheet.ListObjects(TableNameOrIndex)
-        ' Calculate Vanilla Used Range
+    With Sheet.ListObjects(TableRef)
+        ' Calculate Table DataBody Range + Header Range - Total Range
         If .TotalsRowRange Is Nothing Then
-            GetQueryAreaStringFromTable = "[" & Sheet.name & "$" & .Range.Address(False, False) & "]" & IIf(Trim(Alias) = "", vbNullString, " " & Trim(Alias))
+            GetQueryAreaStringFromTable = "[" & Sheet.name & "$" & .Range.Address(False, False) & "]" & IIf(Trim(Alias) = vbNullString, vbNullString, " " & Trim(Alias))
         Else
-             GetQueryAreaStringFromTable = "[" & Sheet.name & "$" & .Range.Resize(.Range.rows.Count - 1, .Range.Columns.Count).Address(False, False) & "]" & IIf(Trim(Alias) = "", vbNullString, " " & Trim(Alias))
+            GetQueryAreaStringFromTable = "[" & Sheet.name & "$" & .Range.Resize(.Range.rows.Count - 1, .Range.Columns.Count).Address(False, False) & "]" & IIf(Trim(Alias) = "", vbNullString, " " & Trim(Alias))
         End If
     End With
 End Function
@@ -403,10 +422,12 @@ Sub TransferResultToRange(LeftTopCell As Range _
         result = rs.GetRows
         
         If WithHeader Then
+            ' Write Header
             For i = 0 To rs.Fields.Count - 1
-                LeftTopCell.Offset(i, 0) = rs.Fields(i).name
+                LeftTopCell.offset(i, 0) = rs.Fields(i).name
             Next i
-            Set LeftTopCell = LeftTopCell.Offset(0, 1)
+            ' Shift LeftTopCell right by 1 column
+            Set LeftTopCell = LeftTopCell.offset(0, 1)
         End If  ' End of Creating Header
         ' Copy query result to LeftTopCell by resziing it to the shape of transposed result
         ' Please Note UBound and LBound Functions: UBound( ArrayName, [Dimension] ), [Dimension] : 1(rows), 2(columns)
@@ -414,11 +435,12 @@ Sub TransferResultToRange(LeftTopCell As Range _
         LeftTopCell.Resize(UBound(result, 1) - LBound(result, 1) + 1, UBound(result, 2) - LBound(result, 2) + 1) = result
     Else  ' No transpose : Headers from Top
         If WithHeader Then
+            ' Write Header
             For i = 0 To rs.Fields.Count - 1
-                LeftTopCell.Offset(0, i) = rs.Fields(i).name
+                LeftTopCell.offset(0, i) = rs.Fields(i).name
             Next i
-            ' Copy query result to LeftTopCell
-           Set LeftTopCell = LeftTopCell.Offset(1, 0)
+            ' Shift LeftTopCell down by 1 row
+            Set LeftTopCell = LeftTopCell.offset(1, 0)
         End If  ' End of Creating Header
         ' Copy query result to LeftTopCell
         rs.MoveFirst
@@ -431,29 +453,47 @@ End Sub
 ' Copy Record Set to Table
 ' -----------------------------------------------------------
 Sub TransferResultToTable(ByRef tbl As ListObject _
-    , Optional ResetTable As Boolean = True _
     , Optional UpdateHeader As Boolean = True _
+    , Optional ResetTable As Boolean = True _
     , Optional AddToBottom As Boolean = False _
+    , Optional AutoFit As Boolean = False _
     )
     rs.MoveFirst
     With tbl
         ' Reset the Table
         If ResetTable Then
-            ' Clear Everything
-            .Range.Resize(.Range.rows.Count - 1, .Range.Columns.Count).Offset(1, 0).Clear
+            ' Clear DataBody Range
+            .Range.Resize(.Range.rows.Count - 1, .Range.Columns.Count).offset(1, 0).Clear
+            ' Clear Header Range
             .HeaderRowRange.ClearContents
+            ' Resize The Header to fit the recordset fields
             If .HeaderRowRange.Columns.Count > rs.Fields.Count Then
+                ' Shrink Table Header
                 Dim extraCols As Range
-                Set extraCols = .HeaderRowRange.Resize(1, .HeaderRowRange.Columns.Count - rs.Fields.Count).Offset(0, rs.Fields.Count)
-                .Resize .Range.Resize(rs.RecordCount + 1, rs.Fields.Count)
+                Set extraCols = .HeaderRowRange.Resize(1, .HeaderRowRange.Columns.Count - rs.Fields.Count).offset(0, rs.Fields.Count)
+                .Resize .Range.Resize(rs.RecordCount + 1 + IIf(.ShowTotals, 1, 0), rs.Fields.Count)
                 extraCols.Clear
             Else
-                .Resize .Range.Resize(rs.RecordCount + 1, rs.Fields.Count)
+                ' Expand Table Header
+                .Resize .Range.Resize(rs.RecordCount + 1 + IIf(.ShowTotals, 1, 0), rs.Fields.Count)
             End If
         End If
         
         ' Update Header
         If UpdateHeader Then
+            If Not ResetTable Then
+                ' Resize The Header to fit the recordset fields
+                If .HeaderRowRange.Columns.Count > rs.Fields.Count Then
+                    ' Shrink Table Header
+                    Dim extraRng As Range
+                    Set extraRng = .Range.Resize(.Range.rows.Count, .HeaderRowRange.Columns.Count - rs.Fields.Count).offset(0, rs.Fields.Count)
+                    .Resize .Range.Resize(rs.RecordCount + 1 + IIf(.ShowTotals, 1, 0), rs.Fields.Count)
+                    extraRng.Clear
+                Else
+                    ' Expand Table Header
+                    .Resize .Range.Resize(rs.RecordCount + 1, rs.Fields.Count)
+                End If
+            End If
             ' Record the Headers
             For i = 0 To rs.Fields.Count - 1
                 .HeaderRowRange.Cells(1, i + 1) = rs.Fields(i).name
@@ -466,16 +506,18 @@ Sub TransferResultToTable(ByRef tbl As ListObject _
             Dim isRowEmpty As Boolean
             isRowEmpty = True
             ' Check if the last listRow in the Table is all Empty (Space Only will be count as blank)
-            With .HeaderRowRange.Offset(.Range.rows.Count - 1, 0)
+            With .HeaderRowRange.offset(.Range.rows.Count - 1, 0)
                 For rowsOffset = 1 To .Cells.Count
-                    If Trim(.Resize(1, 1).Offset(0, rowsOffset - 1)) <> "" Then isRowEmpty = False
+                    If Trim(.Resize(1, 1).offset(0, rowsOffset - 1)) <> "" Then isRowEmpty = False
                 Next rowsOffset
             End With
             rowsOffset = IIf(isRowEmpty, .Range.rows.Count - 1, .Range.rows.Count)
         Else
             rowsOffset = 1
         End If
-         .Range.Resize(1, 1).Offset(rowsOffset, 0).CopyFromRecordset rs
+         .Range.Resize(1, 1).offset(rowsOffset, 0).CopyFromRecordset rs
+         
+         If AutoFit Then .Range.EntireColumn.AutoFit
     End With
 End Sub
 
